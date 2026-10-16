@@ -29,6 +29,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from api.services.audit_service import log_activity_finish, log_activity_start
+from api.services.column_roles import graph_key_columns, identifier_type, is_key
 from api.services.generation_service import assert_review_cleared
 from api.services.source_connector_service import load_registered_source_data
 from api.services.source_service import get_source_kind, load_source_data
@@ -37,14 +38,6 @@ from metadata_store.models import ClassificationResult, SchemaCatalogEntry, Synt
 from privacy.pseudonymization import PseudonymizationError, get_pseudonymizer
 from referential_integrity.service import load_graph
 from synthetic_generation import generator as synthetic_generator
-
-# Most specific first: a column carrying several detected types masks as the first match.
-IDENTIFIER_TYPES = (
-    "SSN", "AADHAAR_NUMBER", "PAN_NUMBER", "MRN", "INSURANCE_ID", "NPI",
-    "CREDIT_CARD", "CREDIT_CARD_CANDIDATE", "ACCOUNT_NUMBER", "EMAIL", "PHONE",
-)
-_KEY_NAME_RE = re.compile(r"(^id$|_id$)", re.IGNORECASE)
-
 
 def _namespace(*parts: str) -> str:
     raw = ".".join(parts).lower()
@@ -68,36 +61,23 @@ def _root_key(graph, table: str, column: str) -> str:
     return f"{key[0]}.{key[1]}"
 
 
-def _graph_key_columns(graph, table: str) -> set:
-    cols = {r.child_column for r in graph.relationships if r.child_table == table}
-    return cols | set(graph.referenced_columns(table))
-
-
-def _identifier_type(classification: ClassificationResult):
-    candidates = [classification.pattern_type] + list(classification.detected_types or [])
-    for id_type in IDENTIFIER_TYPES:
-        if id_type in candidates:
-            return id_type
-    return None
-
-
 def plan_columns(graph, table_name: str, columns: list, classifications: dict) -> dict:
     """{column: {"action": ..., "namespace": ..., "reason": ...}} for every column."""
-    graph_keys = _graph_key_columns(graph, table_name)
+    graph_keys = graph_key_columns(graph, table_name)
     plan = {}
     for col in columns:
         c = classifications.get(col)
         reviewed_not_sensitive = (
             c is not None and c.classification_status == "approved" and c.sensitivity != "sensitive")
 
-        if col in graph_keys or _KEY_NAME_RE.search(col):
+        if is_key(graph_keys, col):
             root = (_root_key(graph, table_name, col) if col in graph_keys else col)
             plan[col] = {"action": "tokenize", "namespace": _namespace("key", root),
                          "reason": "join key"}
         elif reviewed_not_sensitive:
             plan[col] = {"action": "passthrough", "reason": "reviewer approved as not sensitive"}
         elif c is not None and c.sensitivity == "sensitive":
-            id_type = _identifier_type(c)
+            id_type = identifier_type(c)
             if id_type:
                 plan[col] = {"action": "tokenize", "namespace": _namespace("id", id_type),
                              "reason": f"identifier ({id_type})"}
@@ -163,9 +143,17 @@ def mask_table(db: Session, table_name: str, rows: int, username: str, source_id
                     out[col] = value
             masked.append(out)
 
+        # Step 13: masked rows are row-aligned with source_rows.
+        from api.services import plausibility_service, privacy_service
+        privacy = privacy_service.assess_masked(
+            db, table_name, masked, source_rows, plan,
+            domain=plausibility_service.domain_for(table_name, source_id), source_id=source_id)
+        status = privacy_service.release_status(privacy)
         file_name, file_path = synthetic_generator.write_table_csv(table_name, columns, masked, kind="masked")
         dataset = SyntheticDataset(source_table=table_name, source_id=source_id, run_id=run.id,
-                                   row_count=len(masked), file_path=file_path)
+                                   row_count=len(masked), file_path=file_path, release_status=status,
+                                   validation_report={"passed": True, "plausibility": None,
+                                                      "privacy": privacy, "release_status": status})
         db.add(dataset)
         db.commit()
         db.refresh(dataset)
@@ -192,5 +180,7 @@ def mask_table(db: Session, table_name: str, rows: int, username: str, source_id
         "ephemeral_key": pseudonymizer.ephemeral,
         "columns": [{"column": col, **plan[col]} for col in columns],
         "passthrough_columns": [col for col in columns if plan[col]["action"] == "passthrough"],
-        "preview": masked[:10],
+        "release_status": status,
+        "privacy": privacy,
+        "preview": masked[:10] if status != "BLOCKED" else [],
     }

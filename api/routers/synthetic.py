@@ -10,10 +10,14 @@ POST /generate/{table_name}          – steward+ / tester+  (generate synthetic
 GET  /generate/download/{dataset_id} – tester+             (download generated file)
 GET  /generate/history               – reviewer+           (list datasets)
 POST /mask/{table_name}              – steward+            (deterministic masking of real rows, Step 10)
+POST /api/v1/datasets/{id}/release-override – admin           (release a privacy-BLOCKED dataset, audited, Step 13)
 """
+
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 import os
 
@@ -24,6 +28,7 @@ from api.auth.dependencies import (
     require_tester_or_above,
     require_reviewer_or_above,
     require_steward_or_admin,
+    require_admin,
 )
 from api.auth.models import CurrentUser
 
@@ -79,6 +84,14 @@ def download_synthetic_dataset(
     ).first()
     if not dataset or not os.path.exists(dataset.file_path):
         raise HTTPException(status_code=404, detail="Synthetic dataset not found")
+    if dataset.release_status == "BLOCKED":
+        audit_service.record_audit(
+            db, "File Download Blocked", user, "failed",
+            f"{os.path.basename(dataset.file_path)} is blocked by the privacy release gate",
+            source=dataset.source_table, source_type="Synthetic dataset")
+        raise HTTPException(status_code=409, detail=(
+            "This dataset failed the privacy release gate and cannot be downloaded. "
+            "An admin can review the privacy report and record an override."))
 
     audit_service.record_audit(
         db,
@@ -109,6 +122,59 @@ def synthetic_dataset_history(
             "source_table": d.source_table,
             "row_count": d.row_count,
             "created_at": d.created_at.isoformat(),
+            "release_status": d.release_status,
         }
         for d in datasets
     ]
+
+
+class ReleaseOverride(BaseModel):
+    reason: str = Field(..., min_length=10, max_length=1000)
+
+
+@router.get("/api/v1/datasets/{dataset_id}/validation")
+def dataset_validation(
+    dataset_id: str,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(require_reviewer_or_above()),
+):
+    dataset = db.query(SyntheticDataset).filter(SyntheticDataset.public_id == dataset_id).first()
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Synthetic dataset not found")
+    return {
+        "dataset_id": dataset.public_id,
+        "source_table": dataset.source_table,
+        "release_status": dataset.release_status,
+        "override_by": dataset.override_by,
+        "override_reason": dataset.override_reason,
+        "override_at": dataset.override_at.isoformat() if dataset.override_at else None,
+        "validation": dataset.validation_report,
+    }
+
+
+@router.post("/api/v1/datasets/{dataset_id}/release-override")
+def override_release(
+    dataset_id: str,
+    payload: ReleaseOverride,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(require_admin()),
+):
+    """Release a dataset the privacy gate BLOCKED. Admin only; the reason and
+    actor are stored on the dataset and in the append-only audit log."""
+    dataset = db.query(SyntheticDataset).filter(SyntheticDataset.public_id == dataset_id).first()
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Synthetic dataset not found")
+    if dataset.release_status != "BLOCKED":
+        raise HTTPException(status_code=409, detail=f"Dataset is not blocked (status: {dataset.release_status}).")
+    reason = payload.reason.strip()
+    dataset.release_status = "OVERRIDDEN"
+    dataset.override_by = user.username
+    dataset.override_reason = reason
+    dataset.override_at = datetime.utcnow()
+    # record_audit commits the dataset change together with the audit entry.
+    audit_service.record_audit(
+        db, "Privacy Gate Override", user, "complete",
+        f"Dataset {dataset.public_id} ({dataset.source_table}) released despite failed privacy checks: {reason[:300]}",
+        source=dataset.source_table, source_type="Synthetic dataset")
+    return {"dataset_id": dataset.public_id, "release_status": dataset.release_status,
+            "override_by": dataset.override_by}

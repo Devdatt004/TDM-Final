@@ -374,10 +374,13 @@ def generate_related_dataset(db, connector, generator, tables, row_counts=None,
         info = {"name": t, "rows": len(rows), "auto_included": t in auto_included,
                 "columns": [c.name for c in specs[t].columns],
                 "preview": rows[:PREVIEW_ROWS], "dataset_id": None, "file_name": None}
+        if extra is not None and extra.get("release_status") == "BLOCKED":
+            info["preview"] = []
         if published:
             file_name, file_path = generator.write_table_csv(t, info["columns"], rows)
             ds = SyntheticDataset(source_table=t, run_id=run_ids[t], row_count=len(rows), file_path=file_path,
-                                  validation_report=extra)
+                                  validation_report=extra,
+                                  release_status=(extra or {}).get("release_status") or "RELEASED")
             db.add(ds)
             db.flush()
             info["dataset_id"], info["file_name"] = ds.public_id, file_name
@@ -398,6 +401,7 @@ def generate_related_dataset(db, connector, generator, tables, row_counts=None,
         "relationships": report["relationships"],
         "seed": seed,
         "validation": extra,
+        "release_status": (extra or {}).get("release_status") if published else None,
         "created_at": datetime.utcnow().isoformat() + "Z",
     }
     run = IntegrityRun(tables=",".join(order), total_rows=sum(rc.values()), score=report["score"],

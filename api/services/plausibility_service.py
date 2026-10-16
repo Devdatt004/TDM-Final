@@ -104,13 +104,6 @@ def check_source(db: Session, domain: str, include_drafts: bool = True) -> dict:
     return report
 
 
-def release_checks(db: Session, tables: dict, domain, seed=None) -> dict:
-    """All pre-release checks for generated tables, as one envelope stored on
-    each SyntheticDataset: {"passed": bool, "plausibility": report|None}."""
-    plausibility = apply_to_generated(db, tables, domain, seed=seed) if domain else None
-    return {"passed": plausibility is None or plausibility["passed"], "plausibility": plausibility}
-
-
 def apply_to_generated(db: Session, tables: dict, domain, seed=None) -> dict:
     """Repair + validate generated tables. Returns the report (``passed`` False
     means a hard rule still fails and the dataset must not be published)."""

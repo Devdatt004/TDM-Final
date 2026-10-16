@@ -228,6 +228,12 @@ class SyntheticDataset(Base):
     # Release-gate evidence: {"plausibility": {...}, "privacy": {...}} - aggregate
     # reports including the rule versions applied (Steps 12/13). Never row values.
     validation_report = Column(JSON, nullable=True)
+    # Step 13 release gate: RELEASED / BLOCKED (privacy gate failed) / OVERRIDDEN.
+    # NULL = created before the gate existed.
+    release_status = Column(String, nullable=True, index=True)
+    override_by = Column(String, nullable=True)
+    override_reason = Column(Text, nullable=True)
+    override_at = Column(DateTime, nullable=True)
 
 
 class ActivityLog(Base):

@@ -59,6 +59,12 @@ def _validate_type(rule_type: str) -> str:
 def _validate_definition(definition: dict[str, Any], rule_type: str | None = None) -> dict[str, Any]:
     if not isinstance(definition, dict) or not definition:
         raise HTTPException(status_code=422, detail="definition must be a non-empty JSON object.")
+    if rule_type == "PRIVACY" and {"synthetic", "masked"} & set(definition):
+        from api.services.privacy_service import PolicyError, parse_policy
+        try:
+            parse_policy(definition)
+        except PolicyError as exc:
+            raise HTTPException(status_code=422, detail=f"Invalid privacy release policy: {exc}") from exc
     if rule_type == "PLAUSIBILITY":
         from plausibility.rules import RuleDefinitionError, parse
         try:

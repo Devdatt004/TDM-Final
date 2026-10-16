@@ -205,6 +205,7 @@ def generate_synthetic_table(db: Session, table_name: str, num_rows: int = 50,
         row_count=num_rows,
         file_path=file_path,
         validation_report=validation,
+        release_status=(validation or {}).get("release_status") or "RELEASED",
     )
     db.add(dataset)
     db.commit()
@@ -216,8 +217,10 @@ def generate_synthetic_table(db: Session, table_name: str, num_rows: int = 50,
         "source_table": table_name,
         "run_id": run.id,
         "row_count": num_rows,
-        "preview": rows[:10],
+        # A dataset blocked by the privacy gate is not shown either.
+        "preview": rows[:10] if dataset.release_status != "BLOCKED" else [],
         "file_name": file_name,
+        "release_status": dataset.release_status,
         "validation": validation,
     }
 

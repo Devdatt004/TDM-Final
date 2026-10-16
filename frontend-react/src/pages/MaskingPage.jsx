@@ -28,7 +28,9 @@ export default function MaskingPage({ sources, selectedTable, onSelectTable, sel
         `Tokens use key "${data.key_id}"` +
           (data.ephemeral_key ? " (ephemeral development key - tokens change when the backend restarts)." : ".")
       );
-      setStatus(`Masked ${data.row_count} rows (showing ${data.preview.length}). Saved as ${data.file_name}.`);
+      setStatus(data.release_status === "BLOCKED"
+        ? `Masked ${data.row_count} rows, but the privacy release gate BLOCKED this dataset - preview and download are withheld until an admin reviews it.`
+        : `Masked ${data.row_count} rows (showing ${data.preview.length}). Saved as ${data.file_name}.`);
     } catch (err) {
       setStatus("Error: " + err.message);
     } finally {

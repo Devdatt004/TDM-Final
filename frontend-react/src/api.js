@@ -31,7 +31,10 @@ async function request(path, options = {}) {
 
     try {
       const parsed = JSON.parse(message);
-      message = parsed.detail || message;
+      const detail = parsed.detail;
+      // FastAPI validation errors are arrays; release-gate rejections are objects.
+      message = typeof detail === "string" ? detail
+        : detail?.message || (detail ? JSON.stringify(detail) : message);
     } catch {
       // Keep the original response text if it is not JSON.
     }

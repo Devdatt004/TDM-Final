@@ -24,7 +24,9 @@ export default function SyntheticGenerationPanel({ selectedTable, selectedSource
       setColumns(cols);
       setPreview(data.preview);
       setDownloadHref(api.downloadUrl(data.dataset_id));
-      setStatus(`Generated ${data.row_count} rows (preview shows first ${data.preview.length}).`);
+      setStatus(data.release_status === "BLOCKED"
+        ? `Generated ${data.row_count} rows, but the privacy release gate BLOCKED this dataset - preview and download are withheld until an admin reviews it.`
+        : `Generated ${data.row_count} rows (preview shows first ${data.preview.length}).`);
     } catch (err) {
       setStatus("Error: " + err.message);
     } finally {

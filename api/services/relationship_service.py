@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from api.services.audit_service import log_activity_start, log_activity_finish
 from api.services.profiling_service import run_profiling
-from api.services import plausibility_service
+from api.services import release_service
 from Connectors.db_connector import DBConnector
 from referential_integrity import service as ri_service, FEATURE_NAME
 from synthetic_generation import generator as synthetic_generator
@@ -100,7 +100,7 @@ def generate_related_tables_flow(db: Session, tables: list[str], row_counts: dic
             db, _source_connector(domain), synthetic_generator, tables,
             row_counts=row_counts, ensure_parent_coverage=ensure_parent_coverage,
             seed=seed, profile_fn=profile_missing,
-            postprocess=lambda tables: plausibility_service.release_checks(db, tables, domain, seed=seed))
+            postprocess=lambda tables: release_service.release_checks(db, tables, domain, seed=seed, username=username))
     except Exception as e:
         log_activity_finish(db, entry, "failed", str(e))
         raise e
