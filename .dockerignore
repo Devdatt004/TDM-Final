@@ -1,0 +1,21 @@
+# Never ship local data, secrets or build output in the image.
+.git
+.github
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.ruff_cache
+.env
+.env.*
+!.env.example
+*.db
+*.db-*
+*.sqlite*
+*.pem
+*.key
+backups/
+uploaded_files/
+synthetic_output/
+frontend-react/
+tests/
+docs/openapi-v1.json

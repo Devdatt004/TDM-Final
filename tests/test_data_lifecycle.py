@@ -3,7 +3,6 @@ import os
 os.environ.setdefault("TDM_AUTH_MODE", "development")
 
 import base64
-import json
 import sqlite3
 from datetime import datetime, timedelta
 

@@ -23,7 +23,6 @@ from api.services.workflow_service import (
     get_workflow_run,
     get_workflow_steps,
     list_workflow_runs,
-    list_workflows,
     workflows_query,
     start_current_step,
     start_workflow_run,

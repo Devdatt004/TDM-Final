@@ -19,7 +19,7 @@ services:
     # Optional DB drivers (Oracle/MSSQL/PostgreSQL/MySQL connectors) install one by one,
     # so a driver that fails to build can never break the deploy - the UI just shows
     # "driver not installed" for that database type.
-    buildCommand: pip install -r requirements.txt && grep -v '^#' requirements-connectors.txt | while read p; do pip install "$p" || echo "skipped optional driver $p"; done
+    buildCommand: pip install -r requirements.lock && grep -v '^#' requirements-connectors.txt | while read p; do pip install "$p" || echo "skipped optional driver $p"; done
     startCommand: python -m alembic upgrade head && uvicorn api.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: TDM_LOG_RETENTION_DAYS
@@ -32,3 +32,15 @@ services:
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false              # optional - set the real value in the Render dashboard, not here
+      # Required since Step 16: the API refuses to start in production without these
+      # (security/startup_checks.py). Set real values in the Render dashboard.
+      - key: PYTHON_VERSION
+        value: "3.10.5"            # requirements.lock is tested on this version
+      - key: TDM_AUTH_MODE
+        value: production
+      - key: TDM_JWT_SECRET
+        sync: false
+      - key: TDM_ARTIFACT_KEYS
+        sync: false
+      - key: TDM_PSEUDONYM_KEYS
+        sync: false

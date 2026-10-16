@@ -32,7 +32,6 @@ Check kinds (``check`` field)
 
 import re
 from dataclasses import dataclass, field
-from typing import Optional
 
 CHECKS = {"allowed_values", "range", "pattern", "age_range", "date_order", "conditional"}
 SEVERITIES = {"hard", "soft"}

@@ -1,0 +1,26 @@
+# Local / staging stack (Step 17). Copy .env.example to .env and fill in the keys first.
+#   docker compose up --build
+# The API refuses to start in production mode without its secrets (see docs/DATA_LIFECYCLE.md).
+# For a purely local trial set TDM_AUTH_MODE=development in .env - never on a shared host.
+services:
+  api:
+    build: .
+    env_file: .env
+    volumes:
+      - tdm-data:/data
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+  web:
+    build:
+      context: ./frontend-react
+      args:
+        VITE_API_BASE: ${VITE_API_BASE:-http://localhost:8000}
+    ports:
+      - "8080:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+volumes:
+  tdm-data:

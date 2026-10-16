@@ -14,12 +14,15 @@ Step-3 changes
 
 from __future__ import annotations
 
-from typing import Optional, Union
+from typing import TYPE_CHECKING, Optional, Union
 from sqlalchemy.orm import Session
 
 from metadata_store import activity as act
 from metadata_store import audit
 from metadata_store.audit import AuditError  # re-export for callers
+
+if TYPE_CHECKING:
+    from api.auth.models import CurrentUser
 
 
 def log_activity_start(

@@ -20,8 +20,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     bind = op.get_bind()
-    from sqlalchemy.engine.reflection import Inspector
-    inspector = Inspector.from_engine(bind)
+    inspector = sa.inspect(bind)
     tables = inspector.get_table_names()
     if "activity_log" not in tables:
         pass

@@ -12,7 +12,7 @@ from api.auth.models import CurrentUser
 from api.services import audit_service
 from api.services.rule_service import (
     create_rule, get_rule, get_rule_version, list_rule_versions,
-    list_rules, rules_query, set_rule_status, update_rule,
+    rules_query, set_rule_status, update_rule,
 )
 from api.pagination import Page, envelope, page_params, paginate
 from metadata_store.db import get_db
