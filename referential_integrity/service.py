@@ -303,12 +303,14 @@ def _latest_run(db, table):
 
 
 def generate_related_dataset(db, connector, generator, tables, row_counts=None,
-                             ensure_parent_coverage=True, seed=None, profile_fn=None):
+                             ensure_parent_coverage=True, seed=None, profile_fn=None, postprocess=None):
     """
     tables     tables the user asked for; their parents are added automatically
     row_counts {table: rows}; missing tables default to the source's row count (max 1000)
     generator  the synthetic_generation.generator module (column value generator + CSV writer)
     profile_fn callable(table) run for any table that has no profiling run yet
+    postprocess callable({table: rows}) -> report; may repair non-key values in place
+               (plausibility, Step 12). Publishing requires report["passed"].
     """
     row_counts = row_counts or {}
     if not tables:
@@ -361,10 +363,11 @@ def generate_related_dataset(db, connector, generator, tables, row_counts=None,
     result = generate_related(graph, specs, order, generator.generate_value,
                               rng=random.Random(seed),
                               ensure_parent_coverage=ensure_parent_coverage)
+    extra = postprocess(result.tables) if postprocess is not None else None
     report = validate(graph, result.tables, specs,
                       source_fanout=_source_fanout(connector, graph, set(order), counts))
 
-    published = bool(report["passed"])
+    published = bool(report["passed"]) and (extra is None or bool(extra.get("passed", True)))
     table_info = []
     for t in order:
         rows = result.tables[t]
@@ -373,7 +376,8 @@ def generate_related_dataset(db, connector, generator, tables, row_counts=None,
                 "preview": rows[:PREVIEW_ROWS], "dataset_id": None, "file_name": None}
         if published:
             file_name, file_path = generator.write_table_csv(t, info["columns"], rows)
-            ds = SyntheticDataset(source_table=t, run_id=run_ids[t], row_count=len(rows), file_path=file_path)
+            ds = SyntheticDataset(source_table=t, run_id=run_ids[t], row_count=len(rows), file_path=file_path,
+                                  validation_report=extra)
             db.add(ds)
             db.flush()
             info["dataset_id"], info["file_name"] = ds.public_id, file_name
@@ -393,6 +397,7 @@ def generate_related_dataset(db, connector, generator, tables, row_counts=None,
         "checks": report["checks"],
         "relationships": report["relationships"],
         "seed": seed,
+        "validation": extra,
         "created_at": datetime.utcnow().isoformat() + "Z",
     }
     run = IntegrityRun(tables=",".join(order), total_rows=sum(rc.values()), score=report["score"],

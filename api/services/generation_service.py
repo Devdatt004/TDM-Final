@@ -8,6 +8,7 @@ from fastapi import HTTPException
 from sqlalchemy import desc
 from metadata_store.models import AnalysisRun, ClassificationResult, ClassificationReview
 from synthetic_generation import generator as synthetic_generator
+from api.services import plausibility_service
 
 def assert_review_cleared(db: Session, table_name: str, source_id: str = None, action: str = "generating data"):
     """Step 9 gate: every review-required classification in the latest
@@ -54,8 +55,16 @@ def generate_synthetic_data_flow(db: Session, table_name: str, rows: int, purpos
     entry = log_activity_start(db, activity_name, source=table_name, source_type=source_type, user=username)
     
     try:
+        domain = plausibility_service.domain_for(table_name, source_id)
+
+        def release_checks(tables):
+            return plausibility_service.release_checks(db, tables, domain)
+
         result = synthetic_generator.generate_synthetic_table(
-            db, table_name, num_rows=rows, source_id=source_id)
+            db, table_name, num_rows=rows, source_id=source_id, postprocess=release_checks)
+    except synthetic_generator.DatasetRejected as e:
+        log_activity_finish(db, entry, "failed", str(e))
+        raise HTTPException(status_code=422, detail={"message": str(e), "validation": e.report})
     except Exception as e:
         log_activity_finish(db, entry, "failed", str(e))
         raise e

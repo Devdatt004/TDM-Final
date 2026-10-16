@@ -225,6 +225,9 @@ class SyntheticDataset(Base):
     row_count = Column(Integer, nullable=False)
     file_path = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+    # Release-gate evidence: {"plausibility": {...}, "privacy": {...}} - aggregate
+    # reports including the rule versions applied (Steps 12/13). Never row values.
+    validation_report = Column(JSON, nullable=True)
 
 
 class ActivityLog(Base):

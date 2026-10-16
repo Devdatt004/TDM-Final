@@ -1,0 +1,108 @@
+{
+  "domain": "healthcare",
+  "status_note": "PROPOSED starter catalogue. Imported as DRAFT rules; a clinical domain owner must review each rule, set the owner, and activate it. Only ACTIVE rules are enforced.",
+  "rules": [
+    {
+      "rule_key": "plausibility.healthcare.patient_age_range",
+      "name": "Patient age is between 0 and 120",
+      "definition": {
+        "domain": "healthcare", "severity": "hard", "check": "age_range", "table": "patients",
+        "field": "date_of_birth", "min_years": 0, "max_years": 120, "repair": true,
+        "explanation": "A patient's date of birth is not in the future and implies an age of 0-120 years.",
+        "rationale": "Biological limit; no verified human has exceeded ~122 years.",
+        "owner": ""
+      }
+    },
+    {
+      "rule_key": "plausibility.healthcare.patient_gender_values",
+      "name": "Patient gender uses the source code set",
+      "definition": {
+        "domain": "healthcare", "severity": "hard", "check": "allowed_values", "table": "patients",
+        "field": "gender", "values": ["M", "F", "X"], "repair": true,
+        "explanation": "Gender is one of the codes used by the source system (M, F, X).",
+        "rationale": "Observed code set in the source; confirm against the system's data dictionary.",
+        "owner": ""
+      }
+    },
+    {
+      "rule_key": "plausibility.healthcare.patient_blood_group_values",
+      "name": "Blood group is an ABO/Rh group",
+      "definition": {
+        "domain": "healthcare", "severity": "hard", "check": "allowed_values", "table": "patients",
+        "field": "blood_group", "values": ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"], "repair": true,
+        "explanation": "Blood group is one of the eight ABO/Rh(D) groups.",
+        "rationale": "ABO and Rh(D) typing yields exactly these eight groups.",
+        "owner": ""
+      }
+    },
+    {
+      "rule_key": "plausibility.healthcare.appointment_status_values",
+      "name": "Appointment status uses the source code set",
+      "definition": {
+        "domain": "healthcare", "severity": "hard", "check": "allowed_values", "table": "appointments",
+        "field": "status", "values": ["SCHEDULED", "COMPLETED", "CANCELLED"], "repair": true,
+        "explanation": "Appointment status is SCHEDULED, COMPLETED or CANCELLED.",
+        "rationale": "Observed code set in the source system.",
+        "owner": ""
+      }
+    },
+    {
+      "rule_key": "plausibility.healthcare.appointment_after_birth",
+      "name": "Appointment is not before the patient's birth",
+      "definition": {
+        "domain": "healthcare", "severity": "hard", "check": "date_order", "table": "appointments",
+        "earlier": "date_of_birth", "later": "appointment_date",
+        "join": {"fk": "patient_id", "parent_table": "patients", "parent_key": "patient_id"},
+        "explanation": "A patient cannot attend an appointment before they were born.",
+        "rationale": "Event chronology. Evaluated only when patients are generated with appointments.",
+        "owner": ""
+      }
+    },
+    {
+      "rule_key": "plausibility.healthcare.diagnosis_code_icd10_format",
+      "name": "Diagnosis codes are ICD-10 shaped",
+      "definition": {
+        "domain": "healthcare", "severity": "hard", "check": "pattern", "table": "appointments",
+        "field": "diagnosis_code", "regex": "[A-TV-Z][0-9][0-9AB](\\.[0-9A-TV-Z]{1,4})?",
+        "explanation": "Diagnosis codes follow the ICD-10 category/subcategory shape (e.g. E11.9, I10).",
+        "rationale": "ICD-10 code structure: letter, two characters, optional dot and up to 4 more. Shape only, not code validity.",
+        "owner": ""
+      }
+    },
+    {
+      "rule_key": "plausibility.healthcare.claim_amount_range",
+      "name": "Claim amount is positive and bounded",
+      "definition": {
+        "domain": "healthcare", "severity": "hard", "check": "range", "table": "insurance_claims",
+        "field": "claim_amount", "min": 1, "max": 1000000, "repair": true,
+        "explanation": "A claim amount is positive and at most 1,000,000.",
+        "rationale": "Source maximum is ~124,000; upper bound is a generous placeholder for the domain owner to set.",
+        "owner": ""
+      }
+    },
+    {
+      "rule_key": "plausibility.healthcare.claim_after_appointment",
+      "name": "Claim is filed on/after its appointment, within a year",
+      "definition": {
+        "domain": "healthcare", "severity": "soft", "check": "date_order", "table": "insurance_claims",
+        "earlier": "appointment_date", "later": "claim_date", "max_gap_days": 365, "tolerance": 0.05,
+        "join": {"fk": "appointment_id", "parent_table": "appointments", "parent_key": "appointment_id"},
+        "explanation": "Claims are usually filed after the appointment they bill for, within 365 days.",
+        "rationale": "Billing chronology. Soft because the SOURCE data itself has claims dated before their appointment (pre-authorisation?) - domain owner to decide.",
+        "owner": ""
+      }
+    },
+    {
+      "rule_key": "plausibility.healthcare.obstetric_codes_require_female",
+      "name": "Obstetric diagnoses are recorded for female patients",
+      "definition": {
+        "domain": "healthcare", "severity": "soft", "check": "conditional", "table": "patients",
+        "when": {"field": "diagnosis_code", "prefixes": ["O"]},
+        "then": {"field": "gender", "values": ["F"]}, "tolerance": 0.0,
+        "explanation": "ICD-10 chapter O (pregnancy, childbirth) codes apply to female patients.",
+        "rationale": "ICD-10 chapter XV. Soft: gender identity vs. sex at birth and the 'X' code need clinical policy. Not evaluable on this schema until diagnosis and gender share a row.",
+        "owner": ""
+      }
+    }
+  ]
+}

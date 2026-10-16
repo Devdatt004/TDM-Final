@@ -23,6 +23,7 @@ SUPPORTED_RULE_TYPES = {
     "REFERENTIAL_INTEGRITY",      # original name - kept so existing rules stay valid
     "SYNTHETIC_DATA",
     "PRIVACY",
+    "PLAUSIBILITY",               # Step 12 - declarative domain plausibility checks
 }
 ACTIVE = "ACTIVE"
 INACTIVE = "INACTIVE"
@@ -55,9 +56,15 @@ def _validate_type(rule_type: str) -> str:
     return value
 
 
-def _validate_definition(definition: dict[str, Any]) -> dict[str, Any]:
+def _validate_definition(definition: dict[str, Any], rule_type: str | None = None) -> dict[str, Any]:
     if not isinstance(definition, dict) or not definition:
         raise HTTPException(status_code=422, detail="definition must be a non-empty JSON object.")
+    if rule_type == "PLAUSIBILITY":
+        from plausibility.rules import RuleDefinitionError, parse
+        try:
+            parse(definition)
+        except RuleDefinitionError as exc:
+            raise HTTPException(status_code=422, detail=f"Invalid plausibility rule: {exc}") from exc
 
     def inspect(value: Any, path: str = "definition") -> None:
         if isinstance(value, dict):
@@ -98,7 +105,7 @@ def create_rule(
     if not (name or "").strip():
         raise HTTPException(status_code=422, detail="name cannot be blank.")
     normalized_type = _validate_type(rule_type)
-    valid_definition = _validate_definition(definition)
+    valid_definition = _validate_definition(definition, normalized_type)
 
     if db.query(Rule).filter(Rule.rule_key == key).first():
         raise HTTPException(status_code=409, detail=f"Rule key '{key}' already exists.")
@@ -201,7 +208,7 @@ def update_rule(
         rule.description = description
 
     if definition is not None:
-        valid_definition = _validate_definition(definition)
+        valid_definition = _validate_definition(definition, rule.rule_type)
         current = db.query(RuleVersion).filter(
             RuleVersion.rule_id == rule.id,
             RuleVersion.version_number == rule.current_version,

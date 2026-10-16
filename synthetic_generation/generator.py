@@ -119,8 +119,16 @@ def _generate_value(column_name: str, pattern_type: str, data_type: str):
     return fake.word().capitalize()
 
 
+class DatasetRejected(Exception):
+    """Generated rows failed a release check; nothing was written."""
+
+    def __init__(self, message: str, report: dict):
+        super().__init__(message)
+        self.report = report
+
+
 def generate_synthetic_table(db: Session, table_name: str, num_rows: int = 50,
-                             source_id: str = None) -> dict:
+                             source_id: str = None, postprocess=None) -> dict:
     """
     Generate `num_rows` of synthetic data for `table_name`, based on the
     MOST RECENT analysis run for that table (raises if there isn't one -
@@ -133,6 +141,10 @@ def generate_synthetic_table(db: Session, table_name: str, num_rows: int = 50,
     source's analysis run and schema catalog are used, and the dataset is
     recorded against it. ``None`` is the legacy (demo / uploaded file) flow.
     Nothing here connects to, or writes to, the source database.
+
+    ``postprocess(tables)`` (optional) may repair rows in place and returns a
+    report dict; when ``report["passed"]`` is False, DatasetRejected is raised
+    before any file is written.
     """
     run = (
         db.query(AnalysisRun)
@@ -168,6 +180,12 @@ def generate_synthetic_table(db: Session, table_name: str, num_rows: int = 50,
             )
         rows.append(row)
 
+    validation = None
+    if postprocess is not None:
+        validation = postprocess({table_name: rows})
+        if not validation.get("passed", True):
+            raise DatasetRejected("Generated data failed release checks; nothing was saved.", validation)
+
     # ---- Write the CSV file ----
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     file_name = f"{table_name}_synthetic_{timestamp}.csv"
@@ -186,6 +204,7 @@ def generate_synthetic_table(db: Session, table_name: str, num_rows: int = 50,
         run_id=run.id,
         row_count=num_rows,
         file_path=file_path,
+        validation_report=validation,
     )
     db.add(dataset)
     db.commit()
@@ -199,6 +218,7 @@ def generate_synthetic_table(db: Session, table_name: str, num_rows: int = 50,
         "row_count": num_rows,
         "preview": rows[:10],
         "file_name": file_name,
+        "validation": validation,
     }
 
 

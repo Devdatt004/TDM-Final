@@ -1,6 +1,6 @@
 # api/routers/__init__.py
 from fastapi import APIRouter
-from api.routers import core, profiling, synthetic, connectors, relationships, logs, jobs, workflows, reviews
+from api.routers import core, profiling, synthetic, connectors, relationships, logs, jobs, workflows, reviews, plausibility
 
 router = APIRouter()
 
@@ -13,3 +13,4 @@ router.include_router(logs.router)
 router.include_router(jobs.router)
 router.include_router(workflows.router)
 router.include_router(reviews.router)
+router.include_router(plausibility.router)
