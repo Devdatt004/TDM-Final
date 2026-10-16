@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from api.auth.dependencies import require_steward_or_admin, require_tester_or_above
@@ -21,8 +21,8 @@ router = APIRouter(prefix="/api/v1/rules", tags=["Rule Registry"])
 
 
 class RuleCreate(BaseModel):
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
+
     rule_key: str = Field(min_length=2, max_length=100)
     name: str = Field(min_length=1, max_length=200)
     rule_type: str = Field(min_length=1, max_length=50)
@@ -31,8 +31,8 @@ class RuleCreate(BaseModel):
 
 
 class RuleUpdate(BaseModel):
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
+
     name: str | None = Field(default=None, min_length=1, max_length=200)
     description: str | None = Field(default=None, max_length=4000)
     definition: dict[str, Any] | None = None
