@@ -1,16 +1,22 @@
 # api/routers/__init__.py
 from fastapi import APIRouter
-from api.routers import core, profiling, synthetic, connectors, relationships, logs, jobs, workflows, reviews, plausibility
+from api.routers import (
+    core, profiling, synthetic, connectors, relationships, logs,
+    jobs, workflows, reviews, plausibility, datasets, sources, rules,
+)
 
-router = APIRouter()
+# Routers written without a version prefix. Mounted at /api/v1 (canonical,
+# documented) and, temporarily, at their old unversioned paths (deprecated
+# aliases, hidden from OpenAPI). Both mounts share the same handlers.
+unversioned_router = APIRouter()
+unversioned_router.include_router(core.router)
+unversioned_router.include_router(profiling.router)
+unversioned_router.include_router(synthetic.router)
+unversioned_router.include_router(connectors.router)
+unversioned_router.include_router(relationships.router)
+unversioned_router.include_router(logs.router)
 
-router.include_router(core.router)
-router.include_router(profiling.router)
-router.include_router(synthetic.router)
-router.include_router(connectors.router)
-router.include_router(relationships.router)
-router.include_router(logs.router)
-router.include_router(jobs.router)
-router.include_router(workflows.router)
-router.include_router(reviews.router)
-router.include_router(plausibility.router)
+# Routers that already carry their /api/v1/... prefix.
+v1_router = APIRouter()
+for module in (jobs, workflows, reviews, plausibility, datasets, sources, rules):
+    v1_router.include_router(module.router)

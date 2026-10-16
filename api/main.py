@@ -12,8 +12,6 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.routers.sources import router as sources_router
-from api.routers.rules import router as rules_router
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(os.path.join(BASE_DIR, "Connectors"))
@@ -29,7 +27,8 @@ from metadata_store import audit
 from metadata_store.seed import seed_data_dictionary
 
 from api.services import audit_service
-from api.routers import router as api_router
+from api.routers import unversioned_router, v1_router
+from api import http_layer
 
 # Schema initialization and migrations are now handled via Alembic.
 
@@ -68,7 +67,13 @@ async def lifespan(_app):
     yield
     task.cancel()
 
-app = FastAPI(title="TDM Platform API", lifespan=lifespan)
+app = FastAPI(
+    title="TDM Platform API",
+    version="1.0.0",
+    description="Stable contract under /api/v1. Unversioned paths are deprecated aliases (see Sunset header).",
+    lifespan=lifespan,
+)
+http_layer.install(app)
 
 _DEFAULT_ORIGINS = "http://localhost:5500,http://127.0.0.1:5500,http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173"
 ALLOWED_ORIGINS = [o.strip().rstrip("/") for o in os.getenv("TDM_ALLOWED_ORIGINS", _DEFAULT_ORIGINS).split(",") if o.strip()]
@@ -81,10 +86,13 @@ app.add_middleware(
     "Content-Type",
     "X-Dev-User",
     "X-Dev-Roles",
+    "Idempotency-Key",
+    "X-Request-ID",
 ],
+    expose_headers=["X-Request-ID", "Deprecation", "Sunset", "Link", "Idempotent-Replayed"],
 )
 
 # Register all routers
-app.include_router(api_router)
-app.include_router(sources_router)
-app.include_router(rules_router)
+app.include_router(unversioned_router, prefix=http_layer.API_PREFIX)
+app.include_router(v1_router)
+app.include_router(unversioned_router, include_in_schema=False)     # deprecated aliases

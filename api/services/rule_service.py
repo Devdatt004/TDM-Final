@@ -143,13 +143,17 @@ def get_rule(db: Session, rule_id: str) -> Rule:
     return rule
 
 
-def list_rules(
+def list_rules(db: Session, **filters) -> list[Rule]:
+    return rules_query(db, **filters).all()
+
+
+def rules_query(
     db: Session,
     *,
     rule_type: str | None = None,
     status: str | None = None,
     search: str | None = None,
-) -> list[Rule]:
+):
     query = db.query(Rule)
     if rule_type:
         query = query.filter(Rule.rule_type == _validate_type(rule_type))
@@ -161,7 +165,7 @@ def list_rules(
     if search:
         term = f"%{search.strip()}%"
         query = query.filter((Rule.rule_key.ilike(term)) | (Rule.name.ilike(term)))
-    return query.order_by(Rule.created_at.desc(), Rule.rule_key.asc()).all()
+    return query.order_by(Rule.created_at.desc(), Rule.rule_key.asc())
 
 
 def get_rule_version(db: Session, rule_id: str, version_number: int) -> RuleVersion:

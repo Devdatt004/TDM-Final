@@ -78,6 +78,22 @@ class ColumnResult(Base):
     run = relationship("AnalysisRun", back_populates="columns")
 
 
+class IdempotencyRecord(Base):
+    """Step 15 - stored outcome of a POST/PATCH sent with an Idempotency-Key.
+    ``status_code`` NULL means the first request is still running."""
+    __tablename__ = "idempotency_records"
+
+    id = Column(Integer, primary_key=True)
+    scope = Column(String(64), nullable=False)          # sha256 of the caller's credentials
+    key = Column(String(128), nullable=False)
+    fingerprint = Column(String(64), nullable=False)    # sha256 of method, path, query, body
+    status_code = Column(Integer, nullable=True)
+    response_body = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+    __table_args__ = (UniqueConstraint("scope", "key", name="uq_idempotency_scope_key"),)
+
+
 class ColumnProfile(Base):
     """Step 11 - aggregate metrics for one column of one profiling run.
     Aggregates only (see Profiling/aggregate_metrics.py); never raw rows."""

@@ -34,9 +34,10 @@ from api.services.job_service import (
     create_job,
     fail_job,
     get_job,
-    list_jobs,
+    jobs_query,
     start_job,
 )
+from api.pagination import Page, envelope, page_params, paginate
 from metadata_store.db import get_db
 
 
@@ -104,18 +105,16 @@ def create_job_endpoint(
 def list_jobs_endpoint(
     source_id: str | None = None,
     status: str | None = None,
+    page: Page = Depends(page_params),
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(require_tester_or_above()),
 ):
-    jobs = list_jobs(
-        db=db,
-        source_id=source_id,
-        status=status,
-    )
+    total, jobs = paginate(jobs_query(db=db, source_id=source_id, status=status), page)
 
     return {
         "jobs": [_job_response(job) for job in jobs],
         "count": len(jobs),
+        **envelope(page, total),
     }
 
 

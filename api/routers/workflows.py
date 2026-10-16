@@ -24,9 +24,11 @@ from api.services.workflow_service import (
     get_workflow_steps,
     list_workflow_runs,
     list_workflows,
+    workflows_query,
     start_current_step,
     start_workflow_run,
 )
+from api.pagination import Page, envelope, page_params, paginate
 from metadata_store.db import get_db
 
 
@@ -185,13 +187,11 @@ def create_workflow_endpoint(
 @router.get("")
 def list_workflows_endpoint(
     include_inactive: bool = False,
+    page: Page = Depends(page_params),
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(require_tester_or_above()),
 ):
-    workflows = list_workflows(
-        db=db,
-        include_inactive=include_inactive,
-    )
+    total, workflows = paginate(workflows_query(db, include_inactive), page)
 
     return {
         "workflows": [
@@ -199,6 +199,7 @@ def list_workflows_endpoint(
             for workflow in workflows
         ],
         "count": len(workflows),
+        **envelope(page, total),
     }
 
 

@@ -101,12 +101,16 @@ def list_workflows(
     include_inactive: bool = False,
 ) -> list[Workflow]:
     """List workflow definitions."""
+    return workflows_query(db, include_inactive).all()
 
+
+def workflows_query(db: Session, include_inactive: bool = False):
+    """Ordered workflow-definition query."""
     query = db.query(Workflow)
     if not include_inactive:
         query = query.filter(Workflow.is_active.is_(True))
 
-    return query.order_by(Workflow.name.asc()).all()
+    return query.order_by(Workflow.name.asc())
 
 
 def get_workflow(db: Session, workflow_id: str) -> Workflow:

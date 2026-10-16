@@ -12,8 +12,9 @@ from api.auth.models import CurrentUser
 from api.services import audit_service
 from api.services.rule_service import (
     create_rule, get_rule, get_rule_version, list_rule_versions,
-    list_rules, set_rule_status, update_rule,
+    list_rules, rules_query, set_rule_status, update_rule,
 )
+from api.pagination import Page, envelope, page_params, paginate
 from metadata_store.db import get_db
 from metadata_store.models import Rule, RuleVersion
 
@@ -108,11 +109,12 @@ def list_rules_endpoint(
     rule_type: str | None = None,
     status: str | None = None,
     search: str | None = Query(default=None, max_length=200),
+    page: Page = Depends(page_params),
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(require_tester_or_above()),
 ):
-    rows = list_rules(db, rule_type=rule_type, status=status, search=search)
-    return {"rules": [_rule_response(db, row) for row in rows], "count": len(rows)}
+    total, rows = paginate(rules_query(db, rule_type=rule_type, status=status, search=search), page)
+    return {"rules": [_rule_response(db, row) for row in rows], "count": len(rows), **envelope(page, total)}
 
 
 @router.get("/{rule_id}")

@@ -29,6 +29,7 @@ from api.services.source_connector_service import (
     list_source_tables,
     validate_source_connection,
 )
+from api.pagination import Page, envelope, page_params, paginate
 from metadata_store.db import get_db
 from metadata_store.models import Source
 
@@ -183,14 +184,15 @@ def create_source(
 
 @router.get("")
 def list_sources(
+    page: Page = Depends(page_params),
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(require_tester_or_above()),
 ):
-    sources = (
+    total, sources = paginate(
         db.query(Source)
         .filter(Source.status != "DELETED")
-        .order_by(Source.created_at.desc())
-        .all()
+        .order_by(Source.created_at.desc()),
+        page,
     )
 
     return {
@@ -199,6 +201,7 @@ def list_sources(
             for source in sources
         ],
         "count": len(sources),
+        **envelope(page, total),
     }
 
 

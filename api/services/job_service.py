@@ -255,6 +255,15 @@ def list_jobs(
     status: str | None = None,
 ) -> list[Job]:
     """Retrieve jobs, optionally filtered by source and/or status."""
+    return jobs_query(db, source_id=source_id, status=status).all()
+
+
+def jobs_query(
+    db: Session,
+    source_id: str | None = None,
+    status: str | None = None,
+):
+    """Ordered job query, optionally filtered by source and/or status."""
     query = db.query(Job)
 
     if source_id:
@@ -279,4 +288,4 @@ def list_jobs(
 
         query = query.filter(Job.status == normalized_status)
 
-    return query.order_by(Job.created_at.desc()).all()
+    return query.order_by(Job.created_at.desc())

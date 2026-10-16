@@ -47,10 +47,10 @@ async function request(path, options = {}) {
 
 export const api = {
   // Health and dashboard
-  health: () => request("/health"),
-  getTables: () => request("/tables"),
-  getSummary: () => request("/summary"),
-  getRuns: () => request("/runs"),
+  health: () => request("/api/v1/health"),
+  getTables: () => request("/api/v1/tables"),
+  getSummary: () => request("/api/v1/summary"),
+  getRuns: () => request("/api/v1/runs"),
 
   // Source Registry (registered database sources)
   getRegisteredSources: () => request("/api/v1/sources"),
@@ -62,40 +62,40 @@ export const api = {
   // THAT registered source; without it the legacy demo/upload flow is used.
   runAnalysis: (table, sampleSize, sourceId = null) =>
     request(
-      `/analyze/${encodeURIComponent(table)}?sample_size=${sampleSize}` +
+      `/api/v1/analyze/${encodeURIComponent(table)}?sample_size=${sampleSize}` +
         (sourceId ? `&source_id=${encodeURIComponent(sourceId)}` : ""),
       { method: "POST" }
     ),
 
-  getResults: (runId) => request(`/results/${runId}`),
+  getResults: (runId) => request(`/api/v1/results/${runId}`),
 
   getSchemaCatalog: (table, sourceId = null) =>
     request(
-      `/schema-catalog/${encodeURIComponent(table)}` +
+      `/api/v1/schema-catalog/${encodeURIComponent(table)}` +
         (sourceId ? `?source_id=${encodeURIComponent(sourceId)}` : "")
     ),
 
-  getDataDictionary: () => request("/data-dictionary"),
+  getDataDictionary: () => request("/api/v1/data-dictionary"),
 
   // Synthetic data generation
   // purpose: "synthetic" (default) or "masking"
   maskTable: (table, rows, sourceId = null) =>
     request(
-      `/mask/${encodeURIComponent(table)}?rows=${rows}` +
+      `/api/v1/mask/${encodeURIComponent(table)}?rows=${rows}` +
         (sourceId ? `&source_id=${encodeURIComponent(sourceId)}` : ""),
       { method: "POST" }
     ),
 
   generateSynthetic: (table, rows, purpose = "synthetic", sourceId = null) =>
     request(
-      `/generate/${encodeURIComponent(table)}?rows=${rows}&purpose=${purpose}` +
+      `/api/v1/generate/${encodeURIComponent(table)}?rows=${rows}&purpose=${purpose}` +
         (sourceId ? `&source_id=${encodeURIComponent(sourceId)}` : ""),
       { method: "POST" }
     ),
 
   // File upload
   uploadFile: (filename, content) =>
-    request("/upload", {
+    request("/api/v1/upload", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ filename, content }),
@@ -124,24 +124,24 @@ export const api = {
     if (user) q.set("user", user);
 
     const qs = q.toString();
-    return request(`/logs${qs ? `?${qs}` : ""}`);
+    return request(`/api/v1/logs${qs ? `?${qs}` : ""}`);
   },
 
-  getFiles: () => request("/files"),
-  getLogRetention: () => request("/logs/retention"),
-  getAudit: () => request("/audit"),
+  getFiles: () => request("/api/v1/files"),
+  getLogRetention: () => request("/api/v1/logs/retention"),
+  getAudit: () => request("/api/v1/audit"),
 
   // Relationship suggestions
   getRelationshipSuggestions: (domain) =>
-    request(`/relationships/suggestions?domain=${encodeURIComponent(domain)}`),
+    request(`/api/v1/relationships/suggestions?domain=${encodeURIComponent(domain)}`),
 
   // Log management
   purgeLogs: () =>
-    request("/logs/purge", { method: "POST" }),
+    request("/api/v1/logs/purge", { method: "POST" }),
 
   // AI agent
   askAgent: (question, tableName) =>
-    request("/agent/ask", {
+    request("/api/v1/agent/ask", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -151,23 +151,23 @@ export const api = {
     }),
 
   // Data relationship validation (formerly "referential integrity")
-  getDomains: () => request("/domains"),
+  getDomains: () => request("/api/v1/domains"),
 
   getRelationships: (domain, refresh = false) =>
-    request(`/relationships?domain=${encodeURIComponent(domain)}${refresh ? "&refresh=true" : ""}`),
+    request(`/api/v1/relationships?domain=${encodeURIComponent(domain)}${refresh ? "&refresh=true" : ""}`),
 
   refreshRelationships: (domain) =>
-    request(`/relationships/refresh?domain=${encodeURIComponent(domain)}`, { method: "POST" }),
+    request(`/api/v1/relationships/refresh?domain=${encodeURIComponent(domain)}`, { method: "POST" }),
 
   addRelationship: (rel) =>
-    request("/relationships", {
+    request("/api/v1/relationships", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(rel),
     }),
 
   deleteRelationship: (id) =>
-    request(`/relationships/${id}`, { method: "DELETE" }),
+    request(`/api/v1/relationships/${id}`, { method: "DELETE" }),
 
   generateRelated: ({
     tables,
@@ -175,7 +175,7 @@ export const api = {
     ensureParentCoverage,
     seed,
   }) =>
-    request("/generate-related", {
+    request("/api/v1/generate-related", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -186,25 +186,25 @@ export const api = {
       }),
     }),
 
-  getIntegrityRuns: () => request("/integrity/runs"),
+  getIntegrityRuns: () => request("/api/v1/integrity/runs"),
 
   getIntegrityRun: (id) =>
-    request(`/integrity/runs/${id}`),
+    request(`/api/v1/integrity/runs/${id}`),
 
   downloadUrl: (datasetId) =>
-    `${API_BASE}/generate/download/${datasetId}`,
+    `${API_BASE}/api/v1/generate/download/${datasetId}`,
 
   // Database connectors
   getDbConnectors: () =>
-    request("/connectors/db-types"),
+    request("/api/v1/connectors/db-types"),
 
   connectDb: (payload) =>
-    request("/connectors/db/connect", {
+    request("/api/v1/connectors/db/connect", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     }),
 
   disconnectDb: () =>
-    request("/connectors/db/disconnect", { method: "POST" }),
+    request("/api/v1/connectors/db/disconnect", { method: "POST" }),
 };
