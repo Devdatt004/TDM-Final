@@ -3,6 +3,18 @@ import { api } from "../api.js";
 
 const STATUS_OPTIONS = ["PENDING", "APPROVED", "REJECTED", "ALL"];
 
+// What the reviewer's choice does downstream (masking_service.plan_columns).
+const SENSITIVITY_LABELS = {
+  sensitive: "Sensitive",
+  unknown: "Unknown — requires caution",
+  not_sensitive: "Not sensitive",
+};
+const SENSITIVITY_HINTS = {
+  sensitive: "Masking will disguise this column.",
+  unknown: "Masking will still disguise this column, to be safe.",
+  not_sensitive: "Masking will copy this column unchanged.",
+};
+
 export default function HumanReviewPage() {
   const [statusFilter, setStatusFilter] = useState("PENDING");
   const [data, setData] = useState({ items: [], total: 0 });
@@ -101,8 +113,9 @@ export default function HumanReviewPage() {
                 </label>
                 <label className="reviewField">Final sensitivity
                   <select value={correction.sensitivity ?? item.proposed_sensitivity ?? "unknown"} onChange={(e) => setCorrection(item.id, "sensitivity", e.target.value)}>
-                    <option value="sensitive">Sensitive</option><option value="unknown">Unknown — requires caution</option>
+                    {Object.entries(SENSITIVITY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                   </select>
+                  <small className="reviewHint">{SENSITIVITY_HINTS[correction.sensitivity ?? item.proposed_sensitivity ?? "unknown"]}</small>
                 </label>
                 <label className="reviewField">Decision reason (required)
                   <textarea value={reasons[item.id] || ""} onChange={(e) => setReasons((prev) => ({ ...prev, [item.id]: e.target.value }))} rows={2} maxLength={1000} placeholder="Explain why this classification is accepted or rejected." />
@@ -111,7 +124,7 @@ export default function HumanReviewPage() {
                   <button disabled={busyId === item.id} onClick={() => decide(item, "approve")}>{busyId === item.id ? "Saving…" : "Approve"}</button>
                   <button className="secondaryButton" disabled={busyId === item.id} onClick={() => decide(item, "reject")}>Reject</button>
                 </div>
-              </> : <div className="reviewDecision"><strong>Decision by {item.reviewer_username || "unknown reviewer"}</strong><p>{item.decision_reason || "No reason recorded."}</p>{item.reviewed_at && <small>{new Date(item.reviewed_at).toLocaleString()}</small>}</div>}
+              </> : <div className="reviewDecision"><strong>Decision by {item.reviewer_username || "unknown reviewer"}</strong>{item.final_sensitivity && <p>Final sensitivity: <strong>{SENSITIVITY_LABELS[item.final_sensitivity] || item.final_sensitivity}</strong></p>}<p>{item.decision_reason || "No reason recorded."}</p>{item.reviewed_at && <small>{new Date(item.reviewed_at).toLocaleString()}</small>}</div>}
             </article>;
           })}
         </div>

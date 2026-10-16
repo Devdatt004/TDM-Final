@@ -14,9 +14,10 @@ Each column of the latest profiling run is given exactly one action:
                         masks identically in every table.
   substitute            other sensitive data (names, addresses, birth dates, free
                         text with person/location entities) -> Faker value.
-  passthrough           no sensitivity evidence, or a reviewer approved the column
-                        as not sensitive. Listed in the response so nothing is
-                        passed through silently.
+  passthrough           no sensitivity evidence, or a reviewer explicitly approved
+                        the column as "not_sensitive". (Approved as "unknown" is
+                        still masked - unknown is not proven safe.) Listed in the
+                        response so nothing is passed through silently.
 
 The Step 9 review gate applies: masking is refused while any review-required
 column of the latest run is not APPROVED. Raw source values are never written
@@ -68,7 +69,9 @@ def plan_columns(graph, table_name: str, columns: list, classifications: dict) -
     for col in columns:
         c = classifications.get(col)
         reviewed_not_sensitive = (
-            c is not None and c.classification_status == "approved" and c.sensitivity != "sensitive")
+            c is not None and c.classification_status == "approved" and c.sensitivity == "not_sensitive")
+        reviewed_unknown = (
+            c is not None and c.classification_status == "approved" and c.sensitivity == "unknown")
 
         if is_key(graph_keys, col):
             root = (_root_key(graph, table_name, col) if col in graph_keys else col)
@@ -76,11 +79,13 @@ def plan_columns(graph, table_name: str, columns: list, classifications: dict) -
                          "reason": "join key"}
         elif reviewed_not_sensitive:
             plan[col] = {"action": "passthrough", "reason": "reviewer approved as not sensitive"}
-        elif c is not None and c.sensitivity == "sensitive":
+        elif c is not None and (c.sensitivity == "sensitive" or reviewed_unknown):
             id_type = identifier_type(c)
             if id_type:
                 plan[col] = {"action": "tokenize", "namespace": _namespace("id", id_type),
                              "reason": f"identifier ({id_type})"}
+            elif reviewed_unknown:
+                plan[col] = {"action": "substitute", "reason": "reviewer marked unknown - masked to be safe"}
             else:
                 plan[col] = {"action": "substitute",
                              "reason": "sensitive: " + ", ".join(c.detected_types or [c.pattern_type or "evidence"])}

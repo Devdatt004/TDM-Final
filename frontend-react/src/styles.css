@@ -542,6 +542,7 @@ section { margin-bottom: 36px; }
 .reviewEvidence code { background: var(--surface-alt); border-radius: 5px; padding: 4px 6px; font-size: 11px; }
 .reviewField { margin-top: 12px; }
 .reviewField textarea { resize: vertical; width: 100%; box-sizing: border-box; }
+.reviewHint { font-weight: 400; color: var(--muted); }
 .reviewActions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
 .reviewActions .secondaryButton { background: var(--danger-soft); color: var(--danger); }
 .reviewDecision { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 8px; }

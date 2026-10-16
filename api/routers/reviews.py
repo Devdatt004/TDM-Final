@@ -13,6 +13,10 @@ from api.services import audit_service
 from metadata_store.db import get_db
 from metadata_store.models import ClassificationResult, ClassificationReview, AnalysisRun
 
+# Reviewer-settable sensitivity. "not_sensitive" is the only value that lets
+# masking copy a column unchanged; "unknown" is still masked, to be safe.
+REVIEW_SENSITIVITIES = ("sensitive", "unknown", "not_sensitive")
+
 router = APIRouter(prefix="/api/v1/reviews", tags=["Human Review"])
 
 
@@ -115,8 +119,8 @@ def _decide(review_id: int, payload: DecisionPayload, db: Session, user: Current
         sensitivity = payload.sensitivity.strip().lower() if payload.sensitivity is not None else classification.sensitivity
         if payload.pattern_type is not None and not pattern_type:
             raise HTTPException(status_code=422, detail="Pattern type cannot be empty.")
-        if sensitivity not in {"sensitive", "unknown"}:
-            raise HTTPException(status_code=422, detail="Sensitivity must be 'sensitive' or 'unknown'.")
+        if sensitivity not in REVIEW_SENSITIVITIES:
+            raise HTTPException(status_code=422, detail="Sensitivity must be 'sensitive', 'unknown' or 'not_sensitive'.")
         classification.pattern_type = pattern_type
         classification.sensitivity = sensitivity
         classification.classification_status = "approved"
