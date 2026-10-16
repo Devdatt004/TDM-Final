@@ -216,3 +216,33 @@ def run_profiling(
         "rows_sampled": len(rows),
         "sampling": sample_info,
     }
+
+
+def sensitivity_details(db: Session, run_id: int) -> dict:
+    """{column_name: sensitivity result + its human-review state} for one run.
+
+    This is the Step 8 classification (name/pattern/value/NER evidence with a
+    confidence score), as opposed to the legacy format ``verdict``.
+    """
+    rows = (
+        db.query(ClassificationResult, ClassificationReview)
+        .outerjoin(ClassificationReview,
+                   ClassificationReview.classification_result_id == ClassificationResult.id)
+        .filter(ClassificationResult.run_id == run_id)
+        .all()
+    )
+    return {
+        c.column_name: {
+            "sensitivity": c.sensitivity,
+            "sensitivity_confidence": c.sensitivity_confidence,
+            "evidence": list(c.evidence or []),
+            "detected_types": list(c.detected_types or []),
+            "classification_status": c.classification_status,
+            "review_required": c.review_required,
+            "review_id": r.id if r else None,
+            "review_status": r.status if r else None,
+            "reviewer_username": r.reviewer_username if r else None,
+            "rule_pack_version": c.rule_pack_version,
+        }
+        for c, r in rows
+    }

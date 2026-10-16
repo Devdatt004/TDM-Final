@@ -1,5 +1,6 @@
 import VerdictBadge from "./VerdictBadge.jsx";
 import { sensitivityTone } from "../sensitivity.js";
+import { ReviewState, SensitivityBadge } from "./SensitivityInfo.jsx";
 
 export default function SchemaCatalogTable({ tableName, columns, error }) {
   return (
@@ -8,6 +9,8 @@ export default function SchemaCatalogTable({ tableName, columns, error }) {
       <p className="subtitle">
         Native column types (Schema Catalog) joined with each column's classification and its
         business meaning (Data Dictionary) — run Profiling to populate this for a table.
+        <em> Dictionary default</em> is the generic label for the column's format; <em>Detected
+        sensitivity</em> is what profiling and human review concluded for this specific column.
       </p>
 
       {error ? (
@@ -35,8 +38,10 @@ export default function SchemaCatalogTable({ tableName, columns, error }) {
                 <th>Native Type</th>
                 <th>Pattern Type</th>
                 <th>Business Name</th>
-                <th>Sensitivity</th>
-                <th>Verdict</th>
+                <th>Dictionary default</th>
+                <th>Detected sensitivity</th>
+                <th>Review</th>
+                <th>Format verdict</th>
               </tr>
             </thead>
             <tbody>
@@ -53,6 +58,8 @@ export default function SchemaCatalogTable({ tableName, columns, error }) {
                       </span>
                     ) : "-"}
                   </td>
+                  <td><SensitivityBadge info={c.sensitivity} /></td>
+                  <td><ReviewState info={c.sensitivity} /></td>
                   <td><VerdictBadge verdict={c.verdict} /></td>
                 </tr>
               ))}

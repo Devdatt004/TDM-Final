@@ -83,6 +83,7 @@ def get_results(
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
 
+    sensitivity = profiling_service.sensitivity_details(db, run.id)
     return {
         "run_id": run.id,
         "source_id": run.source_id,
@@ -95,9 +96,12 @@ def get_results(
                 "pattern_type": c.pattern_type,
                 "pattern": c.pattern,
                 "match_percentage": c.match_percentage,
+                # Format verdict: does the value format clearly match a specific
+                # known type? Not a sensitivity decision (see "sensitivity").
                 "verdict": c.verdict,
                 "null_percent": c.null_percent,
                 "distinct_count": c.distinct_count,
+                "sensitivity": sensitivity.get(c.column_name),
             }
             for c in run.columns
         ],
@@ -160,6 +164,7 @@ def get_schema_catalog(
         .first()
     )
     classifications = {c.column_name: c for c in latest_run.columns} if latest_run else {}
+    sensitivity = profiling_service.sensitivity_details(db, latest_run.id) if latest_run else {}
     dictionary = {d.pattern_type: d for d in db.query(DataDictionaryEntry).all()}
 
     result = []
@@ -173,7 +178,10 @@ def get_schema_catalog(
             "pattern_type": pattern_type,
             "verdict": classification.verdict if classification else None,
             "business_name": dict_entry.business_name if dict_entry else None,
+            # Dictionary default for this FORMAT (kept for reference) ...
             "sensitivity_level": dict_entry.sensitivity_level if dict_entry else None,
+            # ... and the actual classification of THIS column (Step 8/9).
+            "sensitivity": sensitivity.get(entry.column_name),
         })
     return {"table_name": table_name, "source_id": source_id, "columns": result}
 
