@@ -23,7 +23,7 @@ from metadata_store import activity as act
 from api.services import source_service
 from api.auth.dependencies import get_current_user, require_tester_or_above, require_reviewer_or_above
 from api.auth.models import CurrentUser
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from agents import query_agent
 
 router = APIRouter()
@@ -106,8 +106,8 @@ def summary(
 
 
 class AgentQuestion(BaseModel):
-    question: str
-    table_name: str | None = None
+    question: str = Field(..., min_length=1, max_length=query_agent.MAX_QUESTION_CHARS)
+    table_name: str | None = Field(default=None, max_length=128)
 
 
 @router.post("/agent/ask")
@@ -116,4 +116,9 @@ def agent_ask(
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(require_reviewer_or_above()),
 ):
-    return query_agent.ask(db, payload.question, payload.table_name)
+    try:
+        return query_agent.ask(db, user, payload.question, payload.table_name)
+    except query_agent.RateLimited as e:
+        raise HTTPException(status_code=429, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
