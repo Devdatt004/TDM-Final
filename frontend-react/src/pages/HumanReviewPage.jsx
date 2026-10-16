@@ -106,7 +106,17 @@ export default function HumanReviewPage() {
                 <div><span>Confidence</span><strong>{item.sensitivity_confidence == null ? "—" : `${Math.round(item.sensitivity_confidence * 100)}%`}</strong></div>
                 <div><span>Created</span><strong>{item.created_at ? new Date(item.created_at).toLocaleString() : "—"}</strong></div>
               </div>
-              {Array.isArray(item.evidence) && item.evidence.length > 0 && <div className="reviewEvidence"><span>Evidence</span><div>{item.evidence.map((e) => <code key={e}>{e}</code>)}</div></div>}
+              {Array.isArray(item.evidence) && item.evidence.length > 0 && (
+                <div className="reviewEvidence">
+                  <span>Evidence</span>
+                  <div>
+                    {item.evidence.map((e, idx) => {
+                      const label = typeof e === "string" ? e : (e.label || e.rule || JSON.stringify(e));
+                      return <code key={idx}>{label}</code>;
+                    })}
+                  </div>
+                </div>
+              )}
               {editable ? <>
                 <label className="reviewField">Correct pattern type (optional)
                   <input value={correction.pattern_type ?? item.proposed_pattern_type ?? ""} onChange={(e) => setCorrection(item.id, "pattern_type", e.target.value)} maxLength={100} />

@@ -32,12 +32,12 @@ services:
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false              # optional - set the real value in the Render dashboard, not here
-      # Required since Step 16: the API refuses to start in production without these
-      # (security/startup_checks.py). Set real values in the Render dashboard.
+      # TDM_AUTH_MODE=development allows public demo access using the built-in frontend
+      # (no JWT login screen required). Switch to 'production' if using JWT authentication.
       - key: PYTHON_VERSION
         value: "3.10.5"            # requirements.lock is tested on this version
       - key: TDM_AUTH_MODE
-        value: production
+        value: development
       - key: TDM_JWT_SECRET
         sync: false
       - key: TDM_ARTIFACT_KEYS

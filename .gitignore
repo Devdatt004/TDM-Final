@@ -54,3 +54,15 @@ desktop.ini
 # Local migration helper and temporary backups
 /fix_migration.py
 *.step5-backup
+
+# Deployment
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+node_modules/
+dist/
+.vercel/
