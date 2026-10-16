@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+venv/
+.venv/
+env/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+frontend-react/.env
+frontend-react/.env.*
+!frontend-react/.env.example
+*.pem
+*.key
+
+# Local databases and backups (demo databases may be distributed in release ZIPs,
+# but should not be committed to source control)
+*.db
+*.sqlite
+*.sqlite3
+*.db-*
+*.sqlite-*
+*.bak
+*.backup
+metadata_store_backup_before_migration.db
+
+# Credential-provider source is safe to track; generated caches are not.
+credentials/__pycache__/
+credentials/*.py[cod]
+
+# Runtime-generated files
+uploaded_files/*
+!uploaded_files/.gitkeep
+synthetic_output/*
+!synthetic_output/.gitkeep
+
+# Frontend
+frontend-react/node_modules/
+frontend-react/dist/
+
+# Logs and OS files
+*.log
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local migration helper and temporary backups
+/fix_migration.py
+*.step5-backup

@@ -1,0 +1,10 @@
+# Optional database drivers for the Data Source Connector (Oracle / MSSQL /
+# PostgreSQL / MySQL). SQLite - the demo hospital.db - needs none of these.
+# Install only what you use:   pip install -r requirements-connectors.txt
+# A missing driver does not break the app: the UI shows "driver not installed".
+#
+# All four are pure-Python or ship wheels, so no Oracle Client / ODBC install is needed.
+oracledb
+pymssql
+psycopg2-binary
+pymysql

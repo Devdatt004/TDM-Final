@@ -1,0 +1,34 @@
+# Render Blueprint for the TDM Platform backend - $0/month configuration.
+#
+# Deploy: push this repo to GitHub, then in Render choose
+# "New +" -> "Blueprint" and point it at the repo. Render reads this file
+# and creates the service below automatically, at no cost.
+#
+# Trade-off of free: no persistent disk, so metadata_store.db / uploaded
+# files / synthetic output reset whenever the service redeploys or Render
+# recycles it, and it spins down after 15 min idle (~30-60s cold start on
+# the next request). See DEPLOYMENT.md for a free way to keep the DATA
+# persistent too (a free hosted Postgres), if that matters to you later -
+# the compute itself stays free either way.
+
+services:
+  - type: web
+    name: tdm-platform-api
+    runtime: python
+    plan: free
+    # Optional DB drivers (Oracle/MSSQL/PostgreSQL/MySQL connectors) install one by one,
+    # so a driver that fails to build can never break the deploy - the UI just shows
+    # "driver not installed" for that database type.
+    buildCommand: pip install -r requirements.txt && grep -v '^#' requirements-connectors.txt | while read p; do pip install "$p" || echo "skipped optional driver $p"; done
+    startCommand: python -m alembic upgrade head && uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: TDM_LOG_RETENTION_DAYS
+        value: "5"
+      # Optional: restrict which database hosts users may connect the portal to (comma-separated).
+      # - key: TDM_ALLOWED_DB_HOSTS
+      #   value: "db1.example.com,db2.example.com"
+      # CORS: set to your frontend's URL (e.g. https://your-app.vercel.app).
+      - key: TDM_ALLOWED_ORIGINS
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false              # optional - set the real value in the Render dashboard, not here

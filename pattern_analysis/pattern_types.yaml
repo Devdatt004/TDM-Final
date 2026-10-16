@@ -1,0 +1,41 @@
+# pattern_types.yaml
+#
+# Maps a PATTERN SIGNATURE (built from D=digit, A=letter, S=symbol/separator)
+# to a human-readable PATTERN TYPE label.
+#
+# This is intentionally just a lookup table, not regex - the Pattern Analyzer's
+# job is to describe STRUCTURE, not decide confidence or make PII judgments.
+# That keeps it clean and separate from any future rule/classification layer.
+
+patterns:
+  "DDDDSDDSDD": DATE          # e.g. 1995-05-12  (YYYY-MM-DD)
+  "DDSDDSDDDD": DATE          # e.g. 05-12-1995  (MM-DD-YYYY)
+  "DDSDDSDD": DATE            # e.g. 05-12-95    (MM-DD-YY)
+  "DDDSDDSDDDD": SSN          # e.g. 796-24-9797
+  "SDDDSSDDDSDDDD": PHONE      # e.g. (314) 500-8123
+  "DDDSDDDSDDDD": PHONE       # e.g. 314-500-8123
+  "DDDDD": ZIP_CODE           # e.g. 98110
+  "DDDDDSDDDD": ZIP_PLUS4     # e.g. 98110-1234
+
+  # --- Healthcare-flavored examples (this demo's sample dataset) ---
+  "AAADDDDDD": MRN            # e.g. MRN100001
+  "AADDDDDDDDD": INSURANCE_ID  # e.g. UH637500247
+
+  # --- Banking / Finance-flavored examples ---
+  "DDDDSDDDDSDDDDSDDDD": CREDIT_CARD    # e.g. 4111-1111-1111-1111
+  "DDDDDDDDDDD": ACCOUNT_NUMBER          # e.g. 90184472103 (bank account number)
+  "AAAADDDDDDD": IFSC_CODE               # e.g. HDFC0001234 (bank branch routing code)
+  "AAAAADDDDA": PAN_NUMBER                # e.g. ABCDE1234F (tax ID)
+
+  # --- Cross-industry example (identity docs used by banking, healthcare,
+  #     telecom, government, insurance, and most other regulated sectors) ---
+  "DDDDSDDDDSDDDD": AADHAAR_NUMBER      # e.g. 2345 6789 0123
+
+# The patterns above are examples, not an exhaustive list - this lookup
+# table is meant to grow with whatever industry the platform is pointed
+# at next. Add a signature -> label pair for any structured identifier
+# your source data uses (a claims number, a routing code, an internal
+# reference ID) and the rest of the platform (Data Dictionary, Schema
+# Catalog, Synthetic Generation, Masking recommendations) picks it up
+# automatically - see metadata_store/seed.py for the matching business
+# glossary entry each label needs.
