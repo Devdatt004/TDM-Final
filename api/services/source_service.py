@@ -5,6 +5,7 @@ from Connectors import connection_registry
 from Connectors.file_connector import parse_file
 from metadata_store.models import UploadedSource
 from sample_domains import registry as domains
+from Profiling import sampling
 
 SYSTEM_USER = "system"
 SOURCE_DB_CONNECTION_STRING = domains.connection_string(domains.DEFAULT_DOMAIN)   # kept for older imports
@@ -50,26 +51,34 @@ def list_all_sources(db: Session, username: str = SYSTEM_USER):
     sources += [{"name": u.name, "kind": "file", "file_type": u.file_type} for u in uploads]
     return sources
 
-def load_source_data(db: Session, name: str, limit: int, username: str = None):
+def load_source_data(db: Session, name: str, limit, username: str = None):
+    """Rows, column metadata and sampling info for a demo table, uploaded file
+    or the active external connection. ``limit`` is a row count (head sample)
+    or a Profiling.sampling.SamplingSpec."""
+    spec = sampling.as_spec(limit)
     _, upload = get_source_kind(db, name, username)
     if upload:
         with open(upload.file_path, encoding="utf-8", newline="") as f:
             parsed = parse_file(upload.name, f.read())
-        return parsed["rows"][:limit], parsed["columns"]
+        rows, info = sampling.draw_from_rows(parsed["rows"], spec)
+        return rows, parsed["columns"], info
 
     info, table = get_external_table(username, name)
     if info:
         connector = DBConnector(info["url"], connect_args=info["connect_args"])
         try:
             connector.connect()
-            rows = connector.sample(table, limit=limit, schema=info["schema"])
-            return rows, connector.describe_table(table, schema=info["schema"])
+            rows, sample_info = sampling.draw(connector, table, spec, schema=info["schema"])
+            return rows, connector.describe_table(table, schema=info["schema"]), sample_info
         finally:
             connector.close()
 
     connector = DBConnector(domains.connection_string(domains.domain_of_table(name) or domains.DEFAULT_DOMAIN))
     connector.connect()
-    rows = connector.sample(name, limit=limit)
-    entities = connector.list_entities()
+    try:
+        rows, sample_info = sampling.draw(connector, name, spec)
+        entities = connector.list_entities()
+    finally:
+        connector.close()
     entity = next((e for e in entities if e["table_name"] == name), None)
-    return rows, (entity["columns"] if entity else [])
+    return rows, (entity["columns"] if entity else []), sample_info

@@ -12,7 +12,10 @@ from api.services.classification_service import (
 )
 from pattern_analysis.pattern_analyzer import PatternAnalyzer
 from Profiling.profiler import profile_table
+from Profiling import sampling
+from Profiling.aggregate_metrics import METRICS_VERSION, table_metrics
 from metadata_store.models import (
+    ColumnProfile,
     SchemaCatalogEntry,
     AnalysisRun,
     ColumnResult,
@@ -27,28 +30,33 @@ RULE_PACK_VERSION = "1.0.0"
 def run_profiling(
     db: Session,
     table_name: str,
-    sample_size: int,
+    sample_size,
     username: str = None,
     source_id: str = None,
 ):
     """Profile a table and persist structural and sensitivity results separately.
 
-    Registered sources use their updated_at timestamp as a source-version
-    identifier. The legacy name-based flow remains supported.
+    ``sample_size`` is a row count (head sample, historical behaviour) or a
+    Profiling.sampling.SamplingSpec. Registered sources use their updated_at
+    timestamp as a source-version identifier. The legacy name-based flow
+    remains supported.
     """
     source_version = None
+    spec = sampling.as_spec(sample_size)
 
     if source_id:
-        source, rows, catalog_columns = load_registered_source_data(
-            db, source_id, table_name, sample_size
+        source, rows, catalog_columns, sample_info = load_registered_source_data(
+            db, source_id, table_name, spec
         )
         if source.updated_at is not None:
             source_version = source.updated_at.isoformat()
     else:
         try:
-            rows, catalog_columns = load_source_data(
-                db, table_name, sample_size, username
+            rows, catalog_columns, sample_info = load_source_data(
+                db, table_name, spec, username
             )
+        except sampling.SamplingError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
         except Exception as exc:
             raise HTTPException(
                 status_code=400,
@@ -148,10 +156,21 @@ def run_profiling(
     total_fields = len(column_entries)
     needs_review_count = total_fields - high_confidence_count
 
+    sensitive_columns = {
+        e["column_name"]: e["sensitivity"] == "sensitive" for e in classification_entries
+    }
+    metrics = table_metrics(rows, sensitive_columns, sample_info["population_rows"])
+
     run = AnalysisRun(
         source_table=table_name,
         source_id=source_id,
-        sample_size=sample_size,
+        sample_size=len(rows),
+        sampling_method=sample_info["method"],
+        sampling_seed=sample_info["seed"],
+        stratify_by=sample_info["stratify_by"],
+        population_rows=sample_info["population_rows"],
+        rows_scanned=sample_info["rows_scanned"],
+        sample_reproducible=sample_info["reproducible"],
         total_fields=total_fields,
         high_confidence_count=high_confidence_count,
         needs_review_count=needs_review_count,
@@ -165,6 +184,10 @@ def run_profiling(
 
         for entry in column_entries:
             db.add(ColumnResult(run_id=run.id, **entry))
+
+        for column_name, column_metrics in metrics.items():
+            db.add(ColumnProfile(run_id=run.id, column_name=column_name,
+                                 metrics_version=METRICS_VERSION, metrics=column_metrics))
 
         for entry in classification_entries:
             classification = ClassificationResult(run_id=run.id, **entry)
@@ -191,4 +214,5 @@ def run_profiling(
         "source_table": table_name,
         "total_fields": total_fields,
         "rows_sampled": len(rows),
+        "sampling": sample_info,
     }

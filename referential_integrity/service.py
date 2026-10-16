@@ -160,6 +160,54 @@ def relationship_overview(db, connector, refresh=False):
     }
 
 
+def relationship_health(db, connector):
+    """Step 11 - integrity health of the SOURCE data for every stored relationship.
+
+    Exact aggregates computed in the database (COUNT / COUNT DISTINCT / MAX of a
+    grouped count); no row values leave the source. Table and column names come
+    from the stored graph, which was built from the inspector, never from user input.
+    """
+    schema = _schema(connector)
+    graph, _ = load_graph(db, set(schema.columns))
+    out = []
+    with connector.engine.connect() as conn:
+        for r in graph.relationships:
+            child = sa_table(r.child_table, column(r.child_column))
+            parent = sa_table(r.parent_table, column(r.parent_column))
+            cc, pc = child.c[r.child_column], parent.c[r.parent_column]
+            try:
+                child_rows = conn.execute(select(func.count()).select_from(child)).scalar() or 0
+                refs = conn.execute(select(func.count(cc))).scalar() or 0
+                orphans = conn.execute(
+                    select(func.count(cc)).where(cc.is_not(None), cc.not_in(select(pc).where(pc.is_not(None))))
+                ).scalar() or 0
+                parent_rows = conn.execute(select(func.count(pc))).scalar() or 0
+                parent_distinct = conn.execute(select(func.count(func.distinct(pc)))).scalar() or 0
+                referenced = conn.execute(
+                    select(func.count(func.distinct(cc))).where(cc.in_(select(pc)))).scalar() or 0
+                per_parent = select(func.count().label("n")).where(cc.is_not(None)).group_by(cc).subquery()
+                max_children = conn.execute(select(func.max(per_parent.c.n))).scalar() or 0
+            except Exception:
+                out.append({"relationship": f"{r.child_key} -> {r.parent_key}", "error": "could not be measured"})
+                continue
+            out.append({
+                "relationship": f"{r.child_key} -> {r.parent_key}",
+                "kind": r.kind,
+                "child_rows": int(child_rows),
+                "null_references": int(child_rows - refs),
+                "orphan_references": int(orphans),
+                "orphan_rate": round(orphans / refs, 4) if refs else 0.0,
+                "parent_rows": int(parent_rows),
+                "duplicate_parent_keys": int(parent_rows - parent_distinct),
+                "parents_referenced": int(referenced),
+                "parent_coverage": round(referenced / parent_distinct, 4) if parent_distinct else 0.0,
+                "avg_children_per_parent": round((refs - orphans) / parent_distinct, 2) if parent_distinct else 0.0,
+                "max_children_per_parent": int(max_children),
+                "exact": True,
+            })
+    return {"relationships": out, "measured": len(out)}
+
+
 MIN_INFERRED_MATCH = 95.0     # % of distinct child values that must exist in the parent
 
 

@@ -12,7 +12,7 @@ live in DB_TYPES below, so adding another database later means adding one entry.
 
 import importlib.util
 
-from sqlalchemy import MetaData, Table, create_engine, inspect, select, text
+from sqlalchemy import MetaData, Table, create_engine, func, inspect, select, text
 from sqlalchemy.engine import URL
 
 
@@ -204,14 +204,36 @@ class DBConnector(BaseConnector):
 
         return entities
 
+    def count_rows(self, table_name: str, schema: str | None = None):
+        """COUNT(*) for a table, or None if the source refuses."""
+        table = Table(table_name, MetaData(), autoload_with=self.engine, schema=schema)
+        try:
+            with self.engine.connect() as conn:
+                return int(conn.execute(select(func.count()).select_from(table)).scalar() or 0)
+        except Exception:
+            return None
+
+    def _random_order(self):
+        dialect = self.engine.dialect.name
+        if dialect == "mysql":
+            return func.rand()
+        if dialect == "mssql":
+            return func.newid()
+        if dialect == "oracle":
+            return text("dbms_random.value")
+        return func.random()                 # sqlite, postgresql
+
     def sample(
         self,
         table_name: str,
         limit: int = 10,
-        schema: str | None = None
+        schema: str | None = None,
+        random_order: bool = False,
     ):
         """
-        Pull a sample of rows from a table.
+        Pull a sample of rows from a table. ``random_order`` asks the database
+        for a random subset (costs a sort over the table, so callers only use
+        it when explicitly requested).
         """
         table = Table(
             table_name,
@@ -220,9 +242,12 @@ class DBConnector(BaseConnector):
             schema=schema
         )
 
+        query = select(table)
+        if random_order:
+            query = query.order_by(self._random_order())
         with self.engine.connect() as conn:
             result = conn.execute(
-                select(table).limit(limit)
+                query.limit(limit)
             )
 
             columns = list(result.keys())

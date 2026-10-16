@@ -252,7 +252,7 @@ def test_profile_persists_classification_results(env, banking_id):
 
 def test_profile_healthcare_table_uses_healthcare_source(env, healthcare_id):
     c = env["client"]
-    r = c.post(f"/analyze/patients?sample_size=20&source_id={healthcare_id}", headers=STEWARD)
+    r = c.post(f"/analyze/patients?sample_size=20&method=head&source_id={healthcare_id}", headers=STEWARD)
     assert r.status_code == 200, r.text
     run = c.get(f"/results/{r.json()['run_id']}", headers=ADMIN).json()
     assert run["source_id"] == healthcare_id
@@ -385,7 +385,7 @@ def test_generate_synthetic_for_banking_source_and_source_not_modified(env, bank
 def test_generate_synthetic_for_healthcare_source(env, healthcare_id):
     c = env["client"]
     before = _sha256(env["files"]["healthcare"])
-    assert c.post(f"/analyze/patients?sample_size=20&source_id={healthcare_id}", headers=STEWARD).status_code == 200
+    assert c.post(f"/analyze/patients?sample_size=20&method=head&source_id={healthcare_id}", headers=STEWARD).status_code == 200
     g = c.post(f"/generate/patients?rows=6&source_id={healthcare_id}", headers=TESTER)
     assert g.status_code == 200, g.text
     assert list(g.json()["preview"][0].keys()) == _columns(env["files"]["healthcare"], "patients")
@@ -418,7 +418,7 @@ def test_legacy_tables_endpoint_still_lists_demo_sources(env):
 
 def test_legacy_profile_and_generate_without_source_id(env, banking_id):
     c = env["client"]
-    a = c.post("/analyze/patients?sample_size=15", headers=STEWARD)
+    a = c.post("/analyze/patients?sample_size=15&method=head", headers=STEWARD)
     assert a.status_code == 200, a.text
     assert a.json()["source_id"] is None
     g = c.post("/generate/patients?rows=5", headers=TESTER)

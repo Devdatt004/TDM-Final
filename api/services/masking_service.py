@@ -111,10 +111,10 @@ def plan_columns(graph, table_name: str, columns: list, classifications: dict) -
 
 def _load_rows(db: Session, table_name: str, rows: int, username: str, source_id: str):
     if source_id:
-        _, data, _ = load_registered_source_data(db, source_id, table_name, rows)
+        _, data, _, _ = load_registered_source_data(db, source_id, table_name, rows)
         return data
     try:
-        data, _ = load_source_data(db, table_name, rows, username)
+        data, _, _ = load_source_data(db, table_name, rows, username)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Could not read '{table_name}'.") from exc
     return data

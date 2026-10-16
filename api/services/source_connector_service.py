@@ -191,22 +191,27 @@ def assert_table_in_source(db: Session, source_id: str, table_name: str) -> Sour
         return source
 
 
-def load_registered_source_data(db: Session, source_id: str, table_name: str, limit: int):
+def load_registered_source_data(db: Session, source_id: str, table_name: str, limit):
     """Sample rows + native column metadata from the selected source's DB.
 
-    Read-only (SELECT ... LIMIT). Returns ``(source, rows, columns)``.
+    Read-only. ``limit`` is a row count (head sample) or a SamplingSpec.
+    Returns ``(source, rows, columns, sampling_info)``.
     """
+    from Profiling import sampling
+    spec = sampling.as_spec(limit)
     with open_source_connector(db, source_id) as (source, connector):
         _require_table(connector, source, table_name)
         schema = _schema_of(source)
         try:
-            rows = connector.sample(table_name, limit=limit, schema=schema)
+            rows, sample_info = sampling.draw(connector, table_name, spec, schema=schema)
             columns = connector.describe_table(table_name, schema=schema)
+        except sampling.SamplingError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
         except Exception as exc:
             raise HTTPException(
                 status_code=400,
                 detail=f"Could not read table '{table_name}' from source '{source.name}'.") from exc
-        return source, rows, columns
+        return source, rows, columns, sample_info
 
 
 def validate_source_connection(db: Session, source_id: str) -> dict[str, Any]:

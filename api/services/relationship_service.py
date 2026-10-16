@@ -41,6 +41,14 @@ def get_relationships(db: Session, refresh: bool = False, domain: str = domains.
     return ri_service.relationship_overview(db, _source_connector(domain), refresh=refresh)
 
 
+def get_relationship_health(db: Session, domain: str = domains.DEFAULT_DOMAIN):
+    connector = _source_connector(domain)
+    try:
+        return ri_service.relationship_health(db, connector)
+    finally:
+        connector.close()
+
+
 def refresh_relationships(db: Session, username: str, domain: str = domains.DEFAULT_DOMAIN):
     entry = log_activity_start(db, "Relationship Discovery", source=_source_label(domain), source_type="DB Schema", user=username)
     try:

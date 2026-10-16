@@ -12,6 +12,7 @@ RBAC mapping
 ------------
 GET  /domains                    – reviewer+ (list built-in source domains)
 GET  /relationships              – reviewer+ (read relationships)
+GET  /relationships/health       – reviewer+ (orphan rate / coverage / duplicates on the source, Step 11)
 POST /relationships/refresh      – steward+  (run discovery)
 GET  /relationships/suggestions  – steward+  (find undeclared relationships)
 POST /relationships              – steward+  (confirm an undeclared relationship)
@@ -70,6 +71,18 @@ def get_relationships(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Relationship discovery failed: {e}")
+
+
+@router.get("/relationships/health")
+def get_relationship_health(
+    domain: str = "healthcare",
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(require_reviewer_or_above()),
+):
+    try:
+        return relationship_service.get_relationship_health(db, domain)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/relationships/refresh")

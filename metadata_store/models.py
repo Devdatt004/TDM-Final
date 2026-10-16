@@ -45,6 +45,14 @@ class AnalysisRun(Base):
     status = Column(String, default="complete")
     run_timestamp = Column(DateTime, default=datetime.utcnow)
 
+    # Step 11 - how the sample was drawn, so metrics are reproducible/explainable.
+    sampling_method = Column(String, nullable=True)        # head / random / stratified
+    sampling_seed = Column(Integer, nullable=True)
+    stratify_by = Column(String, nullable=True)
+    population_rows = Column(Integer, nullable=True)       # COUNT(*) of the table, if known
+    rows_scanned = Column(Integer, nullable=True)          # size of the pool the sample came from
+    sample_reproducible = Column(Boolean, nullable=True)
+
     # This lets us do run.columns to get all ColumnResult rows for this run,
     # without writing a manual SQL join every time.
     columns = relationship("ColumnResult", back_populates="run", cascade="all, delete-orphan")
@@ -68,6 +76,21 @@ class ColumnResult(Base):
     distinct_count = Column(Integer, nullable=False, default=0)
 
     run = relationship("AnalysisRun", back_populates="columns")
+
+
+class ColumnProfile(Base):
+    """Step 11 - aggregate metrics for one column of one profiling run.
+    Aggregates only (see Profiling/aggregate_metrics.py); never raw rows."""
+    __tablename__ = "column_profiles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    run_id = Column(Integer, ForeignKey("analysis_runs.id", ondelete="CASCADE"), nullable=False, index=True)
+    column_name = Column(String, nullable=False)
+    metrics_version = Column(String, nullable=False)
+    metrics = Column(JSON, nullable=False, default=dict)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (UniqueConstraint("run_id", "column_name", name="uq_column_profiles_run_column"),)
 
 
 class ClassificationResult(Base):
