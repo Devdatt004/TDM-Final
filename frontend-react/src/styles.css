@@ -283,7 +283,7 @@ tbody tr { transition: background 0.1s ease; }
 tbody tr:hover { background: var(--surface-alt); }
 tbody tr:last-child td { border-bottom: none; }
 
-.badge { padding: 4px 11px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+.badge { display: inline-block; white-space: nowrap; line-height: 1.4; padding: 4px 11px; border-radius: 20px; font-size: 12px; font-weight: 700; }
 .badge.high { background: var(--accent-green-soft); color: var(--accent-green); }
 .badge.review { background: var(--accent-amber-soft); color: var(--accent-amber); }
 
