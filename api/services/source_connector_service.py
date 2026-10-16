@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 
 from Connectors.factory import ConnectorFactory
 from Connectors.db_connector import DB_TYPES, build_connection_url
-from credentials.env_provider import EnvironmentCredentialProvider
+from credentials import resolver as credential_resolver
 from metadata_store.models import Source
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -96,7 +96,7 @@ def build_source_connector(source: Source):
     if not source.credential_ref:
         raise SourceConnectionError("Credential reference is required.")
     try:
-        credentials = EnvironmentCredentialProvider().resolve(source.credential_ref)
+        credentials = credential_resolver.resolve(source.credential_ref)
     except Exception:
         raise SourceConnectionError("Unable to resolve source credentials.")
 

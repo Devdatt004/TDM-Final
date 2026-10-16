@@ -29,12 +29,15 @@ Uses Faker (https://faker.readthedocs.io) - open source, matches the
 
 import os
 import csv
+import io
+import secrets
 from datetime import datetime
 
 from faker import Faker
 from sqlalchemy.orm import Session
 
 from metadata_store.models import AnalysisRun, SchemaCatalogEntry, SyntheticDataset
+from security import artifact_store
 
 fake = Faker()
 
@@ -186,16 +189,9 @@ def generate_synthetic_table(db: Session, table_name: str, num_rows: int = 50,
         if not validation.get("passed", True):
             raise DatasetRejected("Generated data failed release checks; nothing was saved.", validation)
 
-    # ---- Write the CSV file ----
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    file_name = f"{table_name}_synthetic_{timestamp}.csv"
-    file_path = os.path.join(OUTPUT_DIR, file_name)
-
+    # ---- Write the CSV file (encrypted at rest when keys are configured) ----
     fieldnames = [c.column_name for c in columns]
-    with open(file_path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(rows)
+    file_name, file_path = write_table_csv(table_name, fieldnames, rows)
 
     # ---- Materialize the SyntheticDataset record ----
     dataset = SyntheticDataset(
@@ -246,11 +242,13 @@ def reset_unique_pool(seed=None):
 def write_table_csv(table_name: str, fieldnames: list, rows: list, kind: str = "synthetic") -> tuple:
     """Write rows to synthetic_output/<table>_<kind>_<timestamp>.csv
     (same naming as generate_synthetic_table). Returns (file_name, file_path)."""
+    # Random suffix: two jobs in the same second must never share (overwrite) a file.
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    file_name = f"{table_name}_{kind}_{timestamp}.csv"
+    file_name = f"{table_name}_{kind}_{timestamp}_{secrets.token_hex(4)}.csv"
     file_path = os.path.join(OUTPUT_DIR, file_name)
-    with open(file_path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(rows)
+    buffer = io.StringIO(newline="")
+    writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+    writer.writeheader()
+    writer.writerows(rows)
+    artifact_store.write_text(file_path, buffer.getvalue())
     return file_name, file_path

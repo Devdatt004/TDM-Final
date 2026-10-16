@@ -13,12 +13,13 @@ POST /mask/{table_name}              – steward+            (deterministic mask
 """
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 import os
 
 from metadata_store.db import get_db
 from metadata_store.models import SyntheticDataset
+from security import artifact_store
 from api.services import generation_service, audit_service, masking_service
 from api.auth.dependencies import (
     require_tester_or_above,
@@ -78,7 +79,11 @@ def download_synthetic_dataset(
     dataset = db.query(SyntheticDataset).filter(
         SyntheticDataset.public_id == dataset_id
     ).first()
-    if not dataset or not os.path.exists(dataset.file_path):
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Synthetic dataset not found")
+    if dataset.purged_at is not None:
+        raise HTTPException(status_code=410, detail="This dataset passed its retention period and was deleted.")
+    if not os.path.exists(dataset.file_path):
         raise HTTPException(status_code=404, detail="Synthetic dataset not found")
     if dataset.release_status == "BLOCKED":
         audit_service.record_audit(
@@ -98,10 +103,14 @@ def download_synthetic_dataset(
         source=dataset.source_table,
         source_type="Synthetic dataset",
     )
-    return FileResponse(
-        dataset.file_path,
+    try:
+        content = artifact_store.read_bytes(dataset.file_path)
+    except artifact_store.ArtifactKeyError:
+        raise HTTPException(status_code=503, detail="The dataset cannot be decrypted with the configured keys.")
+    return Response(
+        content,
         media_type="text/csv",
-        filename=os.path.basename(dataset.file_path),
+        headers={"Content-Disposition": f'attachment; filename="{os.path.basename(dataset.file_path)}"'},
     )
 
 

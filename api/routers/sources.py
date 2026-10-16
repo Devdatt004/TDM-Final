@@ -16,7 +16,8 @@ from datetime import datetime
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+from credentials.resolver import validate_ref
 from sqlalchemy.orm import Session
 
 from api.auth.dependencies import (
@@ -57,6 +58,14 @@ class SourceCreate(BaseModel):
 
     credential_ref: str | None = None
 
+    @field_validator("credential_ref")
+    @classmethod
+    def _reference_only(cls, value):
+        # Only env:// or vault:// references; a pasted secret is refused, never stored.
+        if value is None or not value.strip():
+            return None
+        return validate_ref(value)
+
 
 class SourceUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
@@ -70,6 +79,14 @@ class SourceUpdate(BaseModel):
 
     credential_ref: str | None = None
     status: str | None = None
+
+    @field_validator("credential_ref")
+    @classmethod
+    def _reference_only(cls, value):
+        # Only env:// or vault:// references; a pasted secret is refused, never stored.
+        if value is None or not value.strip():
+            return None
+        return validate_ref(value)
 
 
 # ---------------------------------------------------------------------------

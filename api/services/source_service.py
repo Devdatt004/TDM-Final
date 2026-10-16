@@ -6,6 +6,7 @@ from Connectors.file_connector import parse_file
 from metadata_store.models import UploadedSource
 from sample_domains import registry as domains
 from Profiling import sampling
+from security import artifact_store
 
 SYSTEM_USER = "system"
 SOURCE_DB_CONNECTION_STRING = domains.connection_string(domains.DEFAULT_DOMAIN)   # kept for older imports
@@ -58,8 +59,7 @@ def load_source_data(db: Session, name: str, limit, username: str = None):
     spec = sampling.as_spec(limit)
     _, upload = get_source_kind(db, name, username)
     if upload:
-        with open(upload.file_path, encoding="utf-8", newline="") as f:
-            parsed = parse_file(upload.name, f.read())
+        parsed = parse_file(upload.name, artifact_store.read_text(upload.file_path))
         rows, info = sampling.draw_from_rows(parsed["rows"], spec)
         return rows, parsed["columns"], info
 

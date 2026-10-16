@@ -21,12 +21,17 @@ sys.path.append(os.path.join(BASE_DIR, "agents"))
 sys.path.append(os.path.join(BASE_DIR, "synthetic_generation"))
 sys.path.append(BASE_DIR)
 
+from security import startup_checks
+
+# Fail fast: a non-development deployment without secrets / with unsafe settings must not start.
+startup_checks.enforce()
+
 from metadata_store.db import Base, engine, get_db, SessionLocal
 from metadata_store import activity as act
 from metadata_store import audit
 from metadata_store.seed import seed_data_dictionary
 
-from api.services import audit_service
+from api.services import audit_service, retention_service
 from api.routers import unversioned_router, v1_router
 from api import http_layer
 
@@ -52,6 +57,10 @@ def _purge_once():
         audit_service.purge_old_logs(session)
     except Exception as e:
         print(f"Log cleanup failed: {e}")
+    try:
+        retention_service.purge_expired(session)
+    except Exception as e:
+        print(f"Artifact retention purge failed: {type(e).__name__}")
     finally:
         session.close()
 

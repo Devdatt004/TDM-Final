@@ -43,7 +43,7 @@ _SAFE_ID = re.compile(r"^[A-Za-z0-9_.:-]{1,128}$")
 
 ERROR_CODES = {
     400: "bad_request", 401: "unauthenticated", 403: "forbidden", 404: "not_found",
-    405: "method_not_allowed", 409: "conflict", 413: "payload_too_large", 422: "validation_error",
+    405: "method_not_allowed", 409: "conflict", 410: "gone", 413: "payload_too_large", 422: "validation_error",
     429: "rate_limited", 500: "internal_error", 503: "unavailable",
 }
 

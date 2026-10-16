@@ -16,6 +16,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from datetime import datetime
 import os
+import re
+import secrets
 
 from metadata_store.db import get_db
 from metadata_store.models import UploadedSource
@@ -32,6 +34,7 @@ from Connectors.db_connector import (
     DBConnector,
 )
 from Connectors import connection_registry
+from security import artifact_store
 from api.services import audit_service
 from api.auth.dependencies import (
     require_steward_or_admin,
@@ -41,6 +44,8 @@ from api.auth.models import CurrentUser
 
 
 router = APIRouter()
+
+_BINARY_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
 
 BASE_DIR = os.path.dirname(
@@ -83,6 +88,14 @@ def upload_source(
             detail="File is too large (limit is about 5 MB).",
         )
 
+    # Landing zone: text files only. NUL / control bytes mean a binary or
+    # disguised file - reject before parsing or storing anything.
+    if _BINARY_RE.search(payload.content):
+        raise HTTPException(
+            status_code=400,
+            detail="File content is not plain text.",
+        )
+
     entry = audit_service.log_activity_start(
         db,
         "File Upload",
@@ -105,33 +118,24 @@ def upload_source(
             detail=str(e),
         )
 
-    path = os.path.join(
-        UPLOAD_DIR,
-        name,
-    )
+    # Stored under a random name (never the user-supplied one) and encrypted
+    # at rest; the display name lives only in the metadata row.
+    extension = os.path.splitext(name)[1].lower()
+    path = os.path.join(UPLOAD_DIR, f"{secrets.token_hex(16)}{extension}")
 
     try:
-        os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-        with open(
-            path,
-            "w",
-            encoding="utf-8",
-            newline="",
-        ) as f:
-            f.write(payload.content)
-
-    except OSError as e:
+        artifact_store.write_text(path, payload.content)
+    except (OSError, artifact_store.ArtifactKeyError) as e:
         audit_service.log_activity_finish(
             db,
             entry,
             "failed",
-            f"Could not save file: {e}",
+            f"Could not save file: {type(e).__name__}",
         )
 
         raise HTTPException(
             status_code=500,
-            detail=f"Could not save file: {e}",
+            detail="Could not save file.",
         )
 
     row_count = len(parsed["rows"])
@@ -144,6 +148,7 @@ def upload_source(
     )
 
     replaced = existing is not None
+    previous_path = existing.file_path if existing else None
 
     if existing:
         existing.file_type = file_type
@@ -166,6 +171,8 @@ def upload_source(
         )
 
     db.commit()
+    if previous_path and previous_path != path and os.path.isfile(previous_path):
+        os.remove(previous_path)
 
     audit_service.log_activity_finish(
         db,
@@ -185,7 +192,6 @@ def upload_source(
         "rows": row_count,
         "columns": column_count,
         "replaced": replaced,
-        "file_path": path,
     }
 
 

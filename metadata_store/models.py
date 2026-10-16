@@ -250,6 +250,8 @@ class SyntheticDataset(Base):
     override_by = Column(String, nullable=True)
     override_reason = Column(Text, nullable=True)
     override_at = Column(DateTime, nullable=True)
+    # Step 16: when the retention purge deleted the file (row kept for lineage).
+    purged_at = Column(DateTime, nullable=True)
 
 
 class ActivityLog(Base):
