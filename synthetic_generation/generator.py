@@ -220,11 +220,11 @@ def reset_unique_pool(seed=None):
         fake.seed_instance(seed)
 
 
-def write_table_csv(table_name: str, fieldnames: list, rows: list) -> tuple:
-    """Write rows to synthetic_output/<table>_synthetic_<timestamp>.csv
+def write_table_csv(table_name: str, fieldnames: list, rows: list, kind: str = "synthetic") -> tuple:
+    """Write rows to synthetic_output/<table>_<kind>_<timestamp>.csv
     (same naming as generate_synthetic_table). Returns (file_name, file_path)."""
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    file_name = f"{table_name}_synthetic_{timestamp}.csv"
+    file_name = f"{table_name}_{kind}_{timestamp}.csv"
     file_path = os.path.join(OUTPUT_DIR, file_name)
     with open(file_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)

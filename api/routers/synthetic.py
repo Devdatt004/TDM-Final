@@ -9,6 +9,7 @@ POST /generate/{table_name}          – steward+ / tester+  (generate synthetic
                                        optional ?source_id=<registered source id>
 GET  /generate/download/{dataset_id} – tester+             (download generated file)
 GET  /generate/history               – reviewer+           (list datasets)
+POST /mask/{table_name}              – steward+            (deterministic masking of real rows, Step 10)
 """
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -18,7 +19,7 @@ import os
 
 from metadata_store.db import get_db
 from metadata_store.models import SyntheticDataset
-from api.services import generation_service, audit_service
+from api.services import generation_service, audit_service, masking_service
 from api.auth.dependencies import (
     require_tester_or_above,
     require_reviewer_or_above,
@@ -48,6 +49,23 @@ def generate_synthetic_data(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Generation failed: {e}")
+
+
+@router.post("/mask/{table_name}")
+def mask_table(
+    table_name: str,
+    rows: int = 50,
+    source_id: str | None = None,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(require_steward_or_admin()),
+):
+    # Reads real source rows, so steward+ (same as profiling) rather than tester+.
+    try:
+        return masking_service.mask_table(db, table_name, rows, user.username, source_id=source_id)
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/generate/download/{dataset_id}")

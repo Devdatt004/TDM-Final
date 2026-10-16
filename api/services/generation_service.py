@@ -9,11 +9,9 @@ from sqlalchemy import desc
 from metadata_store.models import AnalysisRun, ClassificationResult, ClassificationReview
 from synthetic_generation import generator as synthetic_generator
 
-def generate_synthetic_data_flow(db: Session, table_name: str, rows: int, purpose: str, username: str,
-                                 source_id: str = None):
-    validate_row_count(rows)
-
-    # Enforce Step 9 against the latest profiling run for this exact source/table.
+def assert_review_cleared(db: Session, table_name: str, source_id: str = None, action: str = "generating data"):
+    """Step 9 gate: every review-required classification in the latest
+    profiling run for this exact source/table must be APPROVED."""
     latest_run_query = db.query(AnalysisRun).filter(AnalysisRun.source_table == table_name)
     if source_id is None:
         latest_run_query = latest_run_query.filter(AnalysisRun.source_id.is_(None))
@@ -33,11 +31,18 @@ def generate_synthetic_data_flow(db: Session, table_name: str, rows: int, purpos
                 raise HTTPException(
                     status_code=409,
                     detail=(
-                        f"Human review is required before generating data for {table_name}. "
+                        f"Human review is required before {action} for {table_name}. "
                         f"Column '{classification.column_name}' has review status "
                         f"'{review.status if review else 'MISSING'}'. Review and approve it first."
                     ),
                 )
+    return latest_run
+
+
+def generate_synthetic_data_flow(db: Session, table_name: str, rows: int, purpose: str, username: str,
+                                 source_id: str = None):
+    validate_row_count(rows)
+    assert_review_cleared(db, table_name, source_id)
 
     activity_name = "Masking Preview" if purpose == "masking" else "Synthetic Data Generation"
     if source_id:

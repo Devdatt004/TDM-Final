@@ -76,6 +76,13 @@ export const api = {
 
   // Synthetic data generation
   // purpose: "synthetic" (default) or "masking"
+  maskTable: (table, rows, sourceId = null) =>
+    request(
+      `/mask/${encodeURIComponent(table)}?rows=${rows}` +
+        (sourceId ? `&source_id=${encodeURIComponent(sourceId)}` : ""),
+      { method: "POST" }
+    ),
+
   generateSynthetic: (table, rows, purpose = "synthetic", sourceId = null) =>
     request(
       `/generate/${encodeURIComponent(table)}?rows=${rows}&purpose=${purpose}` +
