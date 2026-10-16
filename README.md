@@ -36,6 +36,11 @@ Classifications marked `review_required` are persisted to the Human Review queue
 Apply the new migration with `python -m alembic upgrade head`. The frontend exposes the workflow through the **Human Review** tab. Review endpoints require an authenticated reviewer, steward, or admin role; development headers must never be enabled in production.
 
 
+## Demo guide
+
+New to the platform? [docs/DEMO_GUIDE.md](docs/DEMO_GUIDE.md) explains every page, each use case,
+what happens behind every button, and a 20-minute demo script.
+
 ## Platform hardening (roadmap Steps 9-17)
 
 | Step | Topic | Read |
